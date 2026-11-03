@@ -349,6 +349,7 @@ cmd_install() {
 cmd_upgrade() {
   need_docker
   require_installed
+  copy_self
   local target="$1" prev repo new_image
   [ -n "$target" ] || target="latest"
   prev="$(get_env HK_IMAGE "$DEFAULT_IMAGE")"
