@@ -156,7 +156,7 @@ export const UsageEntryForm = ({
   };
 
   return (
-    <form className="grid gap-4" onSubmit={handleSubmit}>
+    <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
       <section className="grid gap-2">
         <div className="flex items-center justify-between gap-2">
           <h2 className="text-sm font-medium">物品明细</h2>
@@ -181,7 +181,7 @@ export const UsageEntryForm = ({
               className="flex flex-wrap items-center gap-2 rounded-lg border p-2.5"
               key={`row-${index.toString()}`}
             >
-              <div className="min-w-0 flex-1">
+              <div className="w-full min-w-0 sm:flex-1">
                 <ItemPicker
                   disabled={pending}
                   disabledIds={selectedIds.filter(
@@ -194,34 +194,36 @@ export const UsageEntryForm = ({
                   value={row.itemId}
                 />
               </div>
-              <QuantityStepper
-                disabled={pending}
-                label="数量"
-                max={
-                  selectedItem === undefined || selectedItem.stock <= 0
-                    ? undefined
-                    : selectedItem.stock
-                }
-                min={1}
-                onChange={(quantity) => {
-                  updateRow(index, { quantity });
-                }}
-                value={row.quantity}
-              />
-              <Button
-                aria-label="移除该物品"
-                disabled={pending || rows.length <= 1}
-                onClick={() => {
-                  setRows((current) =>
-                    current.filter((_, rowIndex) => rowIndex !== index)
-                  );
-                }}
-                size="icon"
-                type="button"
-                variant="ghost"
-              >
-                <Trash2Icon />
-              </Button>
+              <div className="ml-auto flex items-center gap-2 sm:ml-0">
+                <QuantityStepper
+                  disabled={pending}
+                  label="数量"
+                  max={
+                    selectedItem === undefined || selectedItem.stock <= 0
+                      ? undefined
+                      : selectedItem.stock
+                  }
+                  min={1}
+                  onChange={(quantity) => {
+                    updateRow(index, { quantity });
+                  }}
+                  value={row.quantity}
+                />
+                <Button
+                  aria-label="移除该物品"
+                  disabled={pending || rows.length <= 1}
+                  onClick={() => {
+                    setRows((current) =>
+                      current.filter((_, rowIndex) => rowIndex !== index)
+                    );
+                  }}
+                  size="icon"
+                  type="button"
+                  variant="ghost"
+                >
+                  <Trash2Icon />
+                </Button>
+              </div>
             </div>
           );
         })}
@@ -296,9 +298,11 @@ export const UsageEntryForm = ({
         )}
       </FormField>
 
-      <Button disabled={pending} type="submit">
-        {pending ? "提交中…" : submitLabel}
-      </Button>
+      <div className="bg-background/95 pb-safe-bottom sticky bottom-0 z-10 -mx-4 -mb-4 border-t px-4 pt-3 backdrop-blur">
+        <Button className="w-full" disabled={pending} size="lg" type="submit">
+          {pending ? "提交中…" : submitLabel}
+        </Button>
+      </div>
     </form>
   );
 };

@@ -100,7 +100,7 @@ export const ChangePasswordDialog = ({
           </DialogDescription>
         </DialogHeader>
         <form
-          className="grid gap-3"
+          className="flex flex-col gap-3"
           onSubmit={(event) => {
             event.preventDefault();
 

@@ -236,7 +236,7 @@ const UsageCreateDialog = ({
             title="还没有可用的交接事项"
           />
         ) : (
-          <div className="grid gap-4">
+          <div className="flex flex-col gap-4">
             <FormField id="usage-matter" label="交接事项" required>
               {(field) => (
                 <Select

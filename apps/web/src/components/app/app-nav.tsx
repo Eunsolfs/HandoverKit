@@ -18,7 +18,7 @@ const AppNavItemLink = ({ item, onNavigate }: AppNavItemLinkProps) => {
     <AppLink
       aria-current={active ? "page" : undefined}
       className={cn(
-        "focus-visible:ring-sidebar-ring flex h-9 items-center gap-2.5 rounded-lg px-2 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none",
+        "focus-visible:ring-sidebar-ring flex h-11 items-center gap-2.5 rounded-lg px-2.5 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none lg:h-9",
         active
           ? "bg-sidebar-accent text-sidebar-accent-foreground"
           : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"

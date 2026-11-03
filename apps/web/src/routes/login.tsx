@@ -152,7 +152,7 @@ const LoginPage = () => {
   return (
     <div className="lg:grid lg:min-h-svh lg:grid-cols-[1.05fr_minmax(0,1fr)]">
       <BrandPanel />
-      <div className="flex min-h-svh flex-col items-center justify-center px-4 py-10 sm:px-6">
+      <div className="flex min-h-svh flex-col items-center justify-start px-4 py-8 sm:px-6 sm:py-12 lg:justify-center">
         <div className="w-full max-w-sm space-y-6">
           <div className="lg:hidden">
             <AppBrand />
@@ -260,12 +260,12 @@ const LoginPage = () => {
             </Button>
           </form>
 
-          <p className="text-muted-foreground text-center text-xs">
+          <p className="text-muted-foreground text-center text-xs text-balance">
             账号由管理员创建，系统不开放自助注册。
           </p>
 
           {import.meta.env.DEV ? (
-            <p className="text-muted-foreground border-t pt-4 text-center text-xs">
+            <p className="text-muted-foreground border-t pt-4 text-center text-xs break-words">
               演示账号：admin / Admin@123456（仅开发环境）
             </p>
           ) : null}

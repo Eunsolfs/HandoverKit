@@ -30,7 +30,7 @@ export const AppTopbar = ({ role, teams, title, userName }: AppTopbarProps) => {
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
-    <header className="bg-background/85 border-border sticky top-0 z-30 flex h-14 items-center gap-2 border-b px-3 backdrop-blur sm:px-4 lg:px-6">
+    <header className="bg-background/85 border-border sticky top-0 z-30 flex h-14 items-center gap-1.5 border-b px-2 backdrop-blur sm:gap-2 sm:px-4 lg:px-6">
       <div className="flex items-center gap-1.5 lg:hidden">
         <Sheet onOpenChange={setMenuOpen} open={menuOpen}>
           <SheetTrigger
@@ -56,8 +56,12 @@ export const AppTopbar = ({ role, teams, title, userName }: AppTopbarProps) => {
                 role={role}
               />
             </div>
-            <div className="grid gap-2 border-t p-3">
+            <div className="pb-safe-bottom grid gap-2 border-t p-3">
               {role === "super_admin" ? <TeamSwitcher teams={teams} /> : null}
+              <div className="flex items-center justify-between px-2">
+                <span className="text-muted-foreground text-xs">主题</span>
+                <ModeToggle />
+              </div>
               <UserMenu name={userName} role={role} variant="sidebar" />
             </div>
           </SheetContent>
@@ -67,20 +71,22 @@ export const AppTopbar = ({ role, teams, title, userName }: AppTopbarProps) => {
 
       <p className="hidden text-sm font-semibold lg:block">{title}</p>
 
-      <div className="ml-auto flex items-center gap-1">
+      <div className="ml-auto flex shrink-0 items-center gap-0.5 sm:gap-1">
         {role === "super_admin" ? (
           <span className="hidden sm:block">
             <TeamSwitcher teams={teams} />
           </span>
         ) : null}
-        <AppLink
-          aria-label="打开扫码入口"
-          className={buttonVariants({ size: "icon", variant: "ghost" })}
-          href="/scan"
-        >
-          <QrCodeIcon />
-        </AppLink>
-        <span className="lg:hidden">
+        <span className="hidden sm:block">
+          <AppLink
+            aria-label="打开扫码入口"
+            className={buttonVariants({ size: "icon", variant: "ghost" })}
+            href="/scan"
+          >
+            <QrCodeIcon />
+          </AppLink>
+        </span>
+        <span className="hidden sm:flex lg:hidden">
           <ModeToggle />
         </span>
         <span className="lg:hidden">

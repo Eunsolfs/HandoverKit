@@ -273,7 +273,11 @@ const ItemsPageContent = () => {
       />
 
       <div className="flex flex-wrap items-end gap-3">
-        <FormField id="items-matter" label="交接事项">
+        <FormField
+          className="w-full sm:w-auto"
+          id="items-matter"
+          label="交接事项"
+        >
           {(field) => (
             <Select
               disabled={matters.length === 0}
@@ -288,7 +292,7 @@ const ItemsPageContent = () => {
               }}
               value={selectedMatterId}
             >
-              <SelectTrigger className="w-56" id={field.id}>
+              <SelectTrigger className="w-full sm:w-56" id={field.id}>
                 <SelectValue placeholder="选择交接事项" />
               </SelectTrigger>
               <SelectContent>

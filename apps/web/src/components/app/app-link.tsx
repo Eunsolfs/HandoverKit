@@ -7,6 +7,7 @@ interface AppLinkProps {
   href: string;
   className?: string;
   children: ReactNode;
+  "aria-label"?: string;
   "aria-current"?: "page";
   /** 点击后执行（移动端抽屉导航需要收起抽屉）。 */
   onNavigate?: () => void;
@@ -22,6 +23,7 @@ const isPlainLeftClick = (event: MouseEvent<HTMLAnchorElement>): boolean =>
  */
 export const AppLink = ({
   "aria-current": ariaCurrent,
+  "aria-label": ariaLabel,
   children,
   className,
   href,
@@ -42,6 +44,7 @@ export const AppLink = ({
   return (
     <a
       aria-current={ariaCurrent}
+      aria-label={ariaLabel}
       className={className}
       href={href}
       onClick={handleClick}

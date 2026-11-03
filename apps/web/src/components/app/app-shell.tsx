@@ -21,7 +21,7 @@ const ShellSkeleton = () => (
       <div className="border-border flex h-14 items-center border-b px-4">
         <Skeleton className="h-8 w-32" />
       </div>
-      <div className="mx-auto w-full max-w-[1200px] flex-1 px-4 py-6 sm:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-[1200px] flex-1 px-4 py-6 pb-10 sm:px-6 sm:pb-6 lg:px-8">
         <PageSkeleton />
       </div>
     </div>
@@ -65,7 +65,7 @@ const AppShellFrame = ({
           userName={userName}
         />
         <main
-          className="mx-auto w-full max-w-[1200px] flex-1 px-4 py-6 sm:px-6 lg:px-8"
+          className="mx-auto w-full max-w-[1200px] flex-1 px-4 py-6 pb-10 sm:px-6 sm:pb-6 lg:px-8"
           id={SKIP_TO_CONTENT_ID}
         >
           <Outlet />

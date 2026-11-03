@@ -278,11 +278,15 @@ const UsersPageContent = () => {
             className="flex flex-wrap items-end gap-3"
             onSubmit={submitSearch}
           >
-            <FormField id="user-search" label="搜索">
+            <FormField
+              className="w-full sm:w-auto"
+              id="user-search"
+              label="搜索"
+            >
               {(field) => (
                 <Input
                   {...field}
-                  className="w-52"
+                  className="w-full sm:w-52"
                   maxLength={40}
                   onChange={(event) => {
                     setSearchInput(event.target.value);
@@ -293,7 +297,11 @@ const UsersPageContent = () => {
               )}
             </FormField>
 
-            <FormField id="user-role-filter" label="角色">
+            <FormField
+              className="w-full sm:w-auto"
+              id="user-role-filter"
+              label="角色"
+            >
               {(field) => (
                 <Select
                   items={ROLE_FILTER_OPTIONS}
@@ -304,7 +312,7 @@ const UsersPageContent = () => {
                   }}
                   value={roleFilter}
                 >
-                  <SelectTrigger className="w-36" id={field.id}>
+                  <SelectTrigger className="w-full sm:w-36" id={field.id}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -318,7 +326,11 @@ const UsersPageContent = () => {
               )}
             </FormField>
 
-            <FormField id="user-status-filter" label="状态">
+            <FormField
+              className="w-full sm:w-auto"
+              id="user-status-filter"
+              label="状态"
+            >
               {(field) => (
                 <Select
                   items={STATUS_FILTER_OPTIONS}
@@ -329,7 +341,7 @@ const UsersPageContent = () => {
                   }}
                   value={statusFilter}
                 >
-                  <SelectTrigger className="w-36" id={field.id}>
+                  <SelectTrigger className="w-full sm:w-36" id={field.id}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -344,7 +356,11 @@ const UsersPageContent = () => {
             </FormField>
 
             {isSuper ? (
-              <FormField id="user-team-filter" label="团队">
+              <FormField
+                className="w-full sm:w-auto"
+                id="user-team-filter"
+                label="团队"
+              >
                 {(field) => (
                   <Select
                     items={[
@@ -361,7 +377,7 @@ const UsersPageContent = () => {
                     }}
                     value={teamFilter}
                   >
-                    <SelectTrigger className="w-40" id={field.id}>
+                    <SelectTrigger className="w-full sm:w-40" id={field.id}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -377,7 +393,12 @@ const UsersPageContent = () => {
               </FormField>
             ) : null}
 
-            <Button size="sm" type="submit" variant="outline">
+            <Button
+              className="w-full sm:w-auto"
+              size="sm"
+              type="submit"
+              variant="outline"
+            >
               搜索
             </Button>
           </form>

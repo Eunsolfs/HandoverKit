@@ -138,6 +138,7 @@ export const DataTable = <T,>({
                     <dd
                       className={cn(
                         ALIGN_RIGHT,
+                        "min-w-0 break-words",
                         column.align === "right" && "tabular-nums"
                       )}
                     >

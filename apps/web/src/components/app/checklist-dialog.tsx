@@ -60,7 +60,7 @@ export const ChecklistDialog = ({
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
-        <div className="grid gap-3">
+        <div className="flex flex-col gap-3">
           <p className="text-muted-foreground text-xs">
             已核对 {checkedCount} / {items.length} 项
           </p>

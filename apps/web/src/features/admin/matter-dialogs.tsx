@@ -145,7 +145,11 @@ export const MatterFormDialog = ({
             每个交接事项对应一个独立的用物仓库与二维码。
           </DialogDescription>
         </DialogHeader>
-        <form className="grid gap-3" noValidate onSubmit={handleSubmit}>
+        <form
+          className="flex flex-col gap-3"
+          noValidate
+          onSubmit={handleSubmit}
+        >
           {errors.form === undefined ? null : (
             <p className="text-destructive text-sm" role="alert">
               {errors.form}

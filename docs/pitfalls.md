@@ -114,3 +114,12 @@
 
 - 现象：验证码改为 data:image/svg+xml 的 img 后，Playwright 无法直接从 DOM 文本取字符。
 - 处理：E2E 通过 page.route 拦截 /api/captcha 响应体或直接调用接口，从 SVG 文本里提取字符（tests/support/api.ts 与 login.e2e.ts 已按此实现）。
+
+### 18. 移动端适配的几个通用要点（本轮实践）
+
+- 触控目标：移动端表单/按钮统一 44px（本仓库用 h-11 + lg 恢复桌面密度），checkbox 可用 20px 视觉 + 44px 点击区。
+- 弹窗：手机端 Dialog 用 max-h: calc(100dvh - 2rem) + 内容区 overflow-y-auto，header/footer 设 sticky，避免标题和提交按钮被滚出屏幕。
+- 扫码页：底部固定按钮加 env(safe-area-inset-bottom)，内容区留出等高的 padding-bottom，确保最后一项不被遮挡。
+- 溢出审计：用 Playwright 遍历各宽度，比较 documentElement.scrollWidth 与 innerWidth；只查 body 溢出不够，还要检查弹窗、表格外层与长文本。
+- 开发环境截图里的 TanStack Router / React Query 调试浮层会干扰审计，生产构建已通过 import.meta.env.DEV 关闭；视觉验收以生产预览为准。
+- 真机重点：dvh 与键盘弹起、iOS 输入框字号 <16px 会触发缩放（input 在移动端用 text-base）。

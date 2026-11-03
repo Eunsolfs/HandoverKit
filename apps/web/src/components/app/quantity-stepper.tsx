@@ -27,7 +27,7 @@ export const QuantityStepper = ({
     <div className="flex items-center gap-1">
       <Button
         aria-label={`减少${label}`}
-        className="size-9"
+        className="size-11 lg:size-9"
         disabled={disabled || value <= min}
         onClick={() => {
           onChange(clamp(value - 1));
@@ -40,7 +40,7 @@ export const QuantityStepper = ({
       </Button>
       <Input
         aria-label={label}
-        className="h-9 w-16 text-center"
+        className="w-16 text-center lg:h-9"
         disabled={disabled}
         inputMode="numeric"
         max={max}
@@ -54,7 +54,7 @@ export const QuantityStepper = ({
       />
       <Button
         aria-label={`增加${label}`}
-        className="size-9"
+        className="size-11 lg:size-9"
         disabled={disabled || (max !== undefined && value >= max)}
         onClick={() => {
           onChange(clamp(value + 1));

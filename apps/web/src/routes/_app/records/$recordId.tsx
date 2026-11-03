@@ -177,7 +177,7 @@ const RecordDetailPage = () => {
     <div className="grid gap-6">
       <div className="grid gap-2">
         <AppLink
-          className="text-muted-foreground hover:text-foreground focus-visible:ring-ring inline-flex w-fit items-center gap-1 rounded-md text-xs focus-visible:ring-2 focus-visible:outline-none"
+          className="text-muted-foreground hover:text-foreground focus-visible:ring-ring inline-flex min-h-11 w-fit items-center gap-1 rounded-md px-1 text-xs focus-visible:ring-2 focus-visible:outline-none lg:min-h-0 lg:px-0"
           href="/records"
         >
           <ArrowLeftIcon className="size-3.5" />
@@ -237,11 +237,91 @@ const RecordDetailPage = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <DataTable
-              columns={ITEM_COLUMNS}
-              getRowKey={(item) => item.itemId}
-              rows={record.items}
-            />
+            <div className="hidden md:block">
+              <DataTable
+                columns={ITEM_COLUMNS}
+                getRowKey={(item) => item.itemId}
+                rows={record.items}
+              />
+            </div>
+            <ul className="grid gap-2 md:hidden">
+              {record.items.map((item) => {
+                const note = item.handoverNote ?? item.note;
+
+                return (
+                  <li className="rounded-lg border p-3" key={item.itemId}>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-sm leading-snug font-medium break-words">
+                          {item.itemName}
+                        </p>
+                        <p className="text-muted-foreground text-xs break-words">
+                          {item.itemSpec ?? "无规格"} · 单位 {item.unit}
+                        </p>
+                      </div>
+                      <span className="text-muted-foreground shrink-0 text-xs">
+                        {item.checked || item.handoverChecked
+                          ? "已核对"
+                          : "未核对"}
+                      </span>
+                    </div>
+                    <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+                      <div className="flex items-center justify-between gap-2">
+                        <dt className="text-muted-foreground">应有</dt>
+                        <dd className="tabular-nums">
+                          {item.expectedQty} {item.unit}
+                        </dd>
+                      </div>
+                      <div className="flex items-center justify-between gap-2">
+                        <dt className="text-muted-foreground">实盘</dt>
+                        <dd className="tabular-nums">
+                          {item.actualQty === null
+                            ? "—"
+                            : `${item.actualQty} ${item.unit}`}
+                        </dd>
+                      </div>
+                      <div className="flex items-center justify-between gap-2">
+                        <dt className="text-muted-foreground">接班核对</dt>
+                        <dd
+                          className={
+                            item.checked
+                              ? "text-success font-medium"
+                              : "text-muted-foreground"
+                          }
+                        >
+                          {item.checked ? "已核对" : "未核对"}
+                        </dd>
+                      </div>
+                      <div className="flex items-center justify-between gap-2">
+                        <dt className="text-muted-foreground">交班核对</dt>
+                        <dd
+                          className={
+                            item.handoverChecked
+                              ? "text-success font-medium"
+                              : "text-muted-foreground"
+                          }
+                        >
+                          {item.handoverChecked ? "已核对" : "未核对"}
+                        </dd>
+                      </div>
+                      {item.handoverActualQty === null ? null : (
+                        <div className="flex items-center justify-between gap-2">
+                          <dt className="text-muted-foreground">交班实盘</dt>
+                          <dd className="tabular-nums">
+                            {item.handoverActualQty} {item.unit}
+                          </dd>
+                        </div>
+                      )}
+                    </dl>
+                    {note === null || note.length === 0 ? null : (
+                      <p className="text-muted-foreground mt-2 text-xs break-words">
+                        备注：{note}
+                      </p>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
           </CardContent>
         </Card>
 
@@ -317,7 +397,7 @@ const RecordDetailPage = () => {
                   {record.exceptions.map((exception) => (
                     <li className="grid gap-1 text-sm" key={exception.id}>
                       <div className="flex items-start justify-between gap-2">
-                        <span className="font-medium">
+                        <span className="min-w-0 font-medium break-words">
                           {exception.description}
                         </span>
                         <StatusBadge status={exception.status} />
@@ -348,7 +428,9 @@ const RecordDetailPage = () => {
                   {record.revokeRequests.map((request) => (
                     <li className="grid gap-1 text-sm" key={request.id}>
                       <div className="flex items-start justify-between gap-2">
-                        <span>{request.reason}</span>
+                        <span className="min-w-0 break-words">
+                          {request.reason}
+                        </span>
                         <StatusBadge status={request.status} />
                       </div>
                       <span className="text-muted-foreground text-xs">
@@ -384,7 +466,7 @@ const RecordDetailPage = () => {
                   key={usage.id}
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium">
+                    <p className="text-sm font-medium break-words">
                       {usage.patientName}（
                       {PATIENT_TYPE_LABELS[usage.patientType]} ·{" "}
                       {usage.patientNo}）

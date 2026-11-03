@@ -107,8 +107,8 @@ const AcceptPanel = ({ onDone, record }: AcceptPanelProps) => {
         <ul className="grid gap-2">
           {record.items.map((item) => (
             <li className="rounded-lg border p-3 text-sm" key={item.itemId}>
-              <p className="font-medium">{item.itemName}</p>
-              <p className="text-muted-foreground text-xs">
+              <p className="font-medium break-words">{item.itemName}</p>
+              <p className="text-muted-foreground text-xs break-words">
                 应有 {item.expectedQty} {item.unit} · {actualLine(item)}
                 {item.note === null ? "" : ` · 备注：${item.note}`}
               </p>
@@ -145,7 +145,7 @@ const AcceptPanel = ({ onDone, record }: AcceptPanelProps) => {
           {error}
         </p>
       )}
-      <div className="bg-background/95 sticky bottom-0 -mx-4 border-t px-4 py-3 backdrop-blur">
+      <div className="bg-background/95 pb-safe-bottom sticky bottom-0 -mx-4 border-t px-4 pt-3 backdrop-blur">
         <Button
           className="w-full"
           disabled={acceptMutation.isPending}
@@ -225,7 +225,7 @@ const HandoverPanel = ({ onDone, onGoAccept, record }: HandoverPanelProps) => {
           <ul className="grid gap-2">
             {record.items.map((item) => (
               <li className="rounded-lg border p-3 text-sm" key={item.itemId}>
-                <p className="font-medium">{item.itemName}</p>
+                <p className="font-medium break-words">{item.itemName}</p>
                 <p className="text-muted-foreground text-xs">
                   交班实盘 {handoverActualLine(item)} · 应有 {item.expectedQty}{" "}
                   {item.unit}
@@ -267,7 +267,7 @@ const HandoverPanel = ({ onDone, onGoAccept, record }: HandoverPanelProps) => {
           {error}
         </p>
       )}
-      <div className="bg-background/95 sticky bottom-0 -mx-4 border-t px-4 py-3 backdrop-blur">
+      <div className="bg-background/95 pb-safe-bottom sticky bottom-0 -mx-4 border-t px-4 pt-3 backdrop-blur">
         <Button
           className="w-full"
           disabled={handoverMutation.isPending}
@@ -392,7 +392,7 @@ const ScanPage = () => {
           <StatusBadge status={today.status} />
         </div>
         <div className="mt-3 space-y-0.5">
-          <h1 className="text-lg font-semibold tracking-tight">
+          <h1 className="text-lg font-semibold tracking-tight break-words">
             {data.matter.name}
           </h1>
           <p className="text-muted-foreground text-xs">
@@ -444,7 +444,7 @@ const ScanPage = () => {
         </Tabs>
       </main>
 
-      <footer className="text-muted-foreground border-t px-4 py-3 text-center text-xs">
+      <footer className="text-muted-foreground pb-safe-bottom border-t px-4 pt-3 text-center text-xs">
         <ScanLineIcon aria-hidden="true" className="mr-1 inline size-3.5" />
         扫码页仅显示当前交接事项，请勿分享链接
       </footer>

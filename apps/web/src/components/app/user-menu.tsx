@@ -27,7 +27,7 @@ interface UserMenuProps {
 }
 
 const TOPBAR_TRIGGER_CLASS =
-  "hover:bg-muted flex size-9 items-center justify-center rounded-lg transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none";
+  "hover:bg-muted flex size-11 items-center justify-center rounded-lg transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none lg:size-9";
 
 const SIDEBAR_TRIGGER_CLASS =
   "hover:bg-muted flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none";
@@ -82,7 +82,9 @@ export const UserMenu = ({ name, role, variant = "topbar" }: UserMenuProps) => {
               </span>
             </span>
           ) : null}
-          <ChevronDownIcon className="text-muted-foreground size-3.5" />
+          {variant === "sidebar" ? (
+            <ChevronDownIcon className="text-muted-foreground size-3.5" />
+          ) : null}
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="min-w-44">
           <DropdownMenuGroup>

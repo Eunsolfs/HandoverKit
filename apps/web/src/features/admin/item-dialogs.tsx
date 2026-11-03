@@ -220,7 +220,11 @@ export const ItemFormDialog = ({
               : "库存数量通过入库或盘点调整修改，编辑基础信息不会改变库存。"}
           </DialogDescription>
         </DialogHeader>
-        <form className="grid gap-3" noValidate onSubmit={handleSubmit}>
+        <form
+          className="flex flex-col gap-3"
+          noValidate
+          onSubmit={handleSubmit}
+        >
           {errors.form === undefined ? null : (
             <p className="text-destructive text-sm" role="alert">
               {errors.form}
@@ -514,7 +518,11 @@ export const StockChangeDialog = ({
             {`${item.name} · 当前库存 ${item.stock} ${item.unit}`}
           </DialogDescription>
         </DialogHeader>
-        <form className="grid gap-3" noValidate onSubmit={handleSubmit}>
+        <form
+          className="flex flex-col gap-3"
+          noValidate
+          onSubmit={handleSubmit}
+        >
           {errors.form === undefined ? null : (
             <p className="text-destructive text-sm" role="alert">
               {errors.form}

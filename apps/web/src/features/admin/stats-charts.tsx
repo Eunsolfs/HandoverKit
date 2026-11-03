@@ -67,7 +67,7 @@ export const TrendChart = ({ byDay, className, period }: TrendChartProps) => {
   const points = buildTrendPoints(byDay, period);
 
   return (
-    <div className={cn("h-64 w-full", className)}>
+    <div className={cn("h-56 w-full sm:h-64", className)}>
       <ResponsiveContainer height="100%" width="100%">
         <BarChart
           data={points}

@@ -171,7 +171,11 @@ export const UserCreateDialog = ({
               : "团队管理员只能为本团队创建普通成员账号。"}
           </DialogDescription>
         </DialogHeader>
-        <form className="grid gap-3" noValidate onSubmit={handleSubmit}>
+        <form
+          className="flex flex-col gap-3"
+          noValidate
+          onSubmit={handleSubmit}
+        >
           {errors.form === undefined ? null : (
             <p className="text-destructive text-sm" role="alert">
               {errors.form}
@@ -463,7 +467,11 @@ export const UserEditDialog = ({
               : "可修改姓名、手机号、账号状态；调整角色或团队请谨慎操作。"}
           </DialogDescription>
         </DialogHeader>
-        <form className="grid gap-3" noValidate onSubmit={handleSubmit}>
+        <form
+          className="flex flex-col gap-3"
+          noValidate
+          onSubmit={handleSubmit}
+        >
           {errors.form === undefined ? null : (
             <p className="text-destructive text-sm" role="alert">
               {errors.form}
@@ -688,7 +696,11 @@ export const ResetPasswordDialog = ({
             将重置 {user.name} 的登录密码。对方需要重新登录。
           </DialogDescription>
         </DialogHeader>
-        <form className="grid gap-3" noValidate onSubmit={handleSubmit}>
+        <form
+          className="flex flex-col gap-3"
+          noValidate
+          onSubmit={handleSubmit}
+        >
           {errors.form === undefined ? null : (
             <p className="text-destructive text-sm" role="alert">
               {errors.form}

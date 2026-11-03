@@ -34,21 +34,25 @@ export const StatCard = ({
 }: StatCardProps) => (
   <Card size="sm">
     <CardContent>
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 space-y-1">
-          <p className="text-muted-foreground text-xs font-medium">{label}</p>
-          <p className="text-2xl font-semibold tracking-tight tabular-nums">
+      <div className="flex items-start justify-between gap-2 sm:gap-3">
+        <div className="min-w-0 flex-1 space-y-0.5 sm:space-y-1">
+          <p className="text-muted-foreground line-clamp-2 text-xs leading-snug font-medium">
+            {label}
+          </p>
+          <p className="text-xl leading-tight font-semibold tracking-tight tabular-nums sm:text-2xl">
             {value}
           </p>
           {isPresent(hint) ? (
-            <p className="text-muted-foreground text-xs">{hint}</p>
+            <p className="text-muted-foreground line-clamp-2 text-xs leading-snug">
+              {hint}
+            </p>
           ) : null}
         </div>
         {Icon === undefined ? null : (
           <span
             aria-hidden="true"
             className={cn(
-              "flex size-9 shrink-0 items-center justify-center rounded-lg",
+              "flex size-8 shrink-0 items-center justify-center rounded-lg sm:size-9",
               toneClasses[tone]
             )}
           >

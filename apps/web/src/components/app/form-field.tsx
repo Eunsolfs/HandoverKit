@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import { Label } from "@handoverkit/ui/components/label";
+import { cn } from "@handoverkit/ui/lib/utils";
 
 interface FieldAriaProps {
   id: string;
@@ -11,6 +12,7 @@ interface FieldAriaProps {
 interface FormFieldProps {
   id: string;
   label: string;
+  className?: string;
   error?: string;
   hint?: string;
   required?: boolean;
@@ -20,6 +22,7 @@ interface FormFieldProps {
 /** label 与控件通过 id 关联；错误信息用 aria-describedby 暴露给读屏器。 */
 export const FormField = ({
   children,
+  className,
   error,
   hint,
   id,
@@ -60,7 +63,7 @@ export const FormField = ({
   };
 
   return (
-    <div className="grid gap-1.5">
+    <div className={cn("grid gap-1.5", className)}>
       <Label htmlFor={id}>
         {label}
         {required ? (

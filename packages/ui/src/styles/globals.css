@@ -162,6 +162,11 @@
   }
 }
 
+/* 手机端底部安全区：兼容 iPhone 全面屏的 home 指示条。 */
+@utility pb-safe-bottom {
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

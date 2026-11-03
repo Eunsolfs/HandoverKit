@@ -150,7 +150,11 @@ export const TeamFormDialog = ({ onOpenChange, team }: TeamFormDialogProps) => {
             团队拥有独立的成员、交接事项与物品仓库，跨团队数据互不可见。
           </DialogDescription>
         </DialogHeader>
-        <form className="grid gap-3" noValidate onSubmit={handleSubmit}>
+        <form
+          className="flex flex-col gap-3"
+          noValidate
+          onSubmit={handleSubmit}
+        >
           {errors.form === undefined ? null : (
             <p className="text-destructive text-sm" role="alert">
               {errors.form}

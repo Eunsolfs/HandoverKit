@@ -101,7 +101,7 @@ const COLUMNS: DataTableColumn<RecordSummaryDto>[] = [
     align: "right",
     cell: (record) => (
       <AppLink
-        className="text-primary focus-visible:ring-ring rounded-md text-xs font-medium hover:underline focus-visible:ring-2 focus-visible:outline-none"
+        className="text-primary focus-visible:ring-ring inline-flex min-h-11 items-center rounded-md px-1 text-xs font-medium hover:underline focus-visible:ring-2 focus-visible:outline-none lg:min-h-0 lg:px-0"
         href={`/records/${record.id}`}
       >
         查看详情

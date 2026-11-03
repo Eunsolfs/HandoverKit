@@ -28,7 +28,7 @@ export const PeriodFilter = ({ onChange, value }: PeriodFilterProps) => (
       <button
         aria-pressed={value === option.value}
         className={cn(
-          "focus-visible:ring-ring rounded-md px-3 py-1 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none",
+          "focus-visible:ring-ring min-h-11 min-w-11 rounded-md px-3 py-1 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none lg:min-h-0 lg:min-w-0",
           value === option.value ? PERIOD_ACTIVE_CLASS : PERIOD_IDLE_CLASS
         )}
         key={option.value}
@@ -82,39 +82,41 @@ export const DateRangeFilter = ({
   onChange,
   value,
 }: DateRangeFilterProps) => (
-  <div className="flex flex-wrap items-end gap-2">
-    <div className="grid gap-1">
-      <Label htmlFor="date-range-from">开始日期</Label>
-      <Input
-        className="w-36"
-        disabled={disabled}
-        id="date-range-from"
-        max={value.to}
-        onChange={(event) => {
-          onChange({ ...value, from: event.target.value });
-        }}
-        type="date"
-        value={value.from}
-      />
+  <div className="grid w-full gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-end">
+    <div className="grid grid-cols-2 gap-2 sm:flex sm:gap-2">
+      <div className="grid min-w-0 gap-1">
+        <Label htmlFor="date-range-from">开始日期</Label>
+        <Input
+          className="w-full sm:w-36"
+          disabled={disabled}
+          id="date-range-from"
+          max={value.to}
+          onChange={(event) => {
+            onChange({ ...value, from: event.target.value });
+          }}
+          type="date"
+          value={value.from}
+        />
+      </div>
+      <div className="grid min-w-0 gap-1">
+        <Label htmlFor="date-range-to">结束日期</Label>
+        <Input
+          className="w-full sm:w-36"
+          disabled={disabled}
+          id="date-range-to"
+          min={value.from}
+          onChange={(event) => {
+            onChange({ ...value, to: event.target.value });
+          }}
+          type="date"
+          value={value.to}
+        />
+      </div>
     </div>
-    <div className="grid gap-1">
-      <Label htmlFor="date-range-to">结束日期</Label>
-      <Input
-        className="w-36"
-        disabled={disabled}
-        id="date-range-to"
-        min={value.from}
-        onChange={(event) => {
-          onChange({ ...value, to: event.target.value });
-        }}
-        type="date"
-        value={value.to}
-      />
-    </div>
-    <div className="flex gap-1">
+    <div className="flex flex-wrap gap-1">
       {PRESETS.map((preset) => (
         <button
-          className="text-muted-foreground hover:border-primary hover:text-foreground focus-visible:ring-ring rounded-lg border px-2.5 py-1.5 text-xs transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:opacity-50"
+          className="text-muted-foreground hover:border-primary hover:text-foreground focus-visible:ring-ring min-h-11 rounded-lg border px-3 py-1.5 text-xs transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:opacity-50 lg:min-h-0 lg:px-2.5"
           disabled={disabled}
           key={preset.label}
           onClick={() => {

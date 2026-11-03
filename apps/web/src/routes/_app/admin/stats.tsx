@@ -210,7 +210,7 @@ const StatsPageContent = () => {
             <button
               aria-pressed={period === option.value}
               className={cn(
-                "focus-visible:ring-ring rounded-md px-3 py-1 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none",
+                "focus-visible:ring-ring min-h-11 min-w-11 rounded-md px-3 py-1 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none lg:min-h-0 lg:min-w-0",
                 period === option.value
                   ? "bg-background text-foreground shadow-xs"
                   : "text-muted-foreground hover:text-foreground"
@@ -258,11 +258,15 @@ const StatsPageContent = () => {
           </Button>
         </div>
 
-        <FormField id="stats-anchor-date" label="锚点日期">
+        <FormField
+          className="w-full sm:w-auto"
+          id="stats-anchor-date"
+          label="锚点日期"
+        >
           {(field) => (
             <Input
               {...field}
-              className="w-40"
+              className="w-full sm:w-40"
               onChange={(event) => {
                 if (event.target.value.length > 0) {
                   setAnchorDate(event.target.value);
@@ -274,7 +278,11 @@ const StatsPageContent = () => {
           )}
         </FormField>
 
-        <FormField id="stats-matter-filter" label="交接事项">
+        <FormField
+          className="w-full sm:w-auto"
+          id="stats-matter-filter"
+          label="交接事项"
+        >
           {(field) => (
             <Select
               items={[
@@ -291,7 +299,7 @@ const StatsPageContent = () => {
               }}
               value={matterFilter}
             >
-              <SelectTrigger className="w-48" id={field.id}>
+              <SelectTrigger className="w-full sm:w-48" id={field.id}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -307,7 +315,7 @@ const StatsPageContent = () => {
         </FormField>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-3 xl:grid-cols-6">
         <StatCard
           hint={rangeLabel}
           icon={BoxesIcon}

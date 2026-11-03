@@ -85,7 +85,7 @@ const MetricCards = ({
   today,
   usageCount,
 }: MetricCardsProps) => (
-  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+  <div className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-4">
     <StatCard
       hint={team === null ? undefined : team.code}
       icon={QrCodeIcon}
@@ -157,11 +157,15 @@ const TodayCard = ({ admin, matters, teamName }: TodayCardProps) => (
             >
               <div className="min-w-0 flex-1 space-y-0.5">
                 <p className="truncate text-sm font-medium">{matter.name}</p>
-                <p className="text-muted-foreground text-xs">
-                  {matter.code === null ? "" : `编码 ${matter.code} · `}
-                  {matter.itemCount > 0
-                    ? `${matter.itemCount} 种物品`
-                    : "暂无物品"}
+                <p className="text-muted-foreground flex flex-wrap gap-x-1 text-xs">
+                  {matter.code === null ? null : (
+                    <span>编码 {matter.code}</span>
+                  )}
+                  <span>
+                    {matter.itemCount > 0
+                      ? `${matter.itemCount} 种物品`
+                      : "暂无物品"}
+                  </span>
                 </p>
               </div>
               {matter.todayStatus === null ? (
@@ -174,7 +178,7 @@ const TodayCard = ({ admin, matters, teamName }: TodayCardProps) => (
                 <StatusBadge status={matter.todayStatus} />
               )}
               <AppLink
-                className="text-primary focus-visible:ring-ring inline-flex items-center gap-1 rounded-md text-xs font-medium hover:underline focus-visible:ring-2 focus-visible:outline-none"
+                className="text-primary focus-visible:ring-ring inline-flex min-h-11 items-center gap-1 rounded-md px-1 text-xs font-medium hover:underline focus-visible:ring-2 focus-visible:outline-none lg:min-h-0 lg:px-0"
                 href={`/records?matterId=${matter.id}`}
               >
                 查看记录
@@ -210,7 +214,7 @@ const QuickActionsCard = () => (
             </span>
             <span className="grid min-w-0 gap-0.5">
               <span className="text-sm font-medium">{action.title}</span>
-              <span className="text-muted-foreground truncate text-xs">
+              <span className="text-muted-foreground line-clamp-2 text-xs">
                 {action.description}
               </span>
             </span>
