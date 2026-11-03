@@ -65,7 +65,29 @@ pnpm run dev   # web:5173  api:3000
 
 > 生产部署请通过环境变量覆盖 `SEED_ADMIN_PASSWORD`，登录后立即在「个人中心」修改密码。
 
-## Docker / 1Panel 部署
+## 发布与部署
+
+### 一键安装（GitHub Release，推荐）
+
+打 tag（如 `v0.1.2`）会自动触发 GitHub Actions：质量门禁 → 构建镜像推送 GHCR → 创建 Release 并上传部署资产。服务器上一条命令：
+
+```bash
+curl -fsSL https://github.com/Eunsolfs/HandoverKit/releases/latest/download/handoverkit-ops.sh -o /tmp/ops.sh
+sudo bash /tmp/ops.sh install
+```
+
+安装完成后输出访问地址与初始管理员账号；后续运维用同一脚本：
+
+```bash
+sudo bash /opt/handoverkit/ops.sh status     # 状态/健康检查
+sudo bash /opt/handoverkit/ops.sh upgrade    # 升级（自动备份，可 rollback）
+sudo bash /opt/handoverkit/ops.sh backup     # 备份 SQLite + .env
+sudo bash /opt/handoverkit/ops.sh logs       # 日志
+```
+
+详见 [docs/release-and-ops.md](docs/release-and-ops.md)（发布流程、一键安装、升级回滚、备份恢复、离线/私有镜像、1Panel 反代 HTTPS、FAQ）。
+
+### 从源码构建（开发 / 自定义）
 
 ```bash
 cp .env.example .env      # 填写 BETTER_AUTH_SECRET / BETTER_AUTH_URL
@@ -74,7 +96,7 @@ docker compose up -d --build
 
 - 数据库持久化在 Docker 数据卷 `data`（容器内 `/data/app.db`）。
 - `migrate` 服务在应用启动前自动执行迁移，升级只需重建镜像并 `docker compose up -d`。
-- 1Panel 详细步骤见 [docs/deployment-1panel.md](docs/deployment-1panel.md)。
+- 1Panel 手动步骤见 [docs/deployment-1panel.md](docs/deployment-1panel.md)。
 
 ## 环境变量
 

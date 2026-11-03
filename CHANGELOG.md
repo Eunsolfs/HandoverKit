@@ -1,5 +1,13 @@
 # 更新日志
 
+## v0.1.2（2026-11-03）发布自动化与一键运维
+
+- GitHub Actions：push tag 自动执行质量门禁（check/knip/57 集成测试）→ 构建 Docker 镜像推送 GHCR（多阶段、非 root、OCI labels、SBOM/provenance）→ 创建 GitHub Release。
+- Release 资产：一键运维脚本 handoverkit-ops.sh、生产 docker-compose.yml、env.example、部署文档、tar.gz、SHA256。
+- scripts/ops.sh：一键安装（交互/非交互、自动生成密钥、健康检查）、升级（自动备份 + 回滚）、在线备份/恢复、状态/日志/重启/卸载/自检、交互式菜单、dry-run。
+- 新增 deploy/docker-compose.release.yml 与 deploy/env.release.example；Dockerfile 增加 OCI 标签与版本 build-arg。
+- 文档：docs/release-and-ops.md（发布流水线、一键安装、1Panel、升级回滚、备份恢复、私有/离线镜像、FAQ）。
+
 ## v0.1.1（2026-11-03）移动端适配
 
 - 全局触控目标：按钮/输入框/选择器/菜单/复选框在 <lg 提升到 44px，lg 起保持桌面密度；补充 pb-safe-bottom 安全区工具类。

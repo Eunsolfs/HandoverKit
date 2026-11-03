@@ -1,0 +1,197 @@
+name: Release
+
+# 打 tag（如 v0.1.2）自动：质量门禁 -> 构建并推送 GHCR 镜像 -> 创建 GitHub Release 并上传部署资产
+# 也可在 Actions 页面手动运行（需填写已存在的 tag）
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "发布标签（需已存在的 tag，例如 v0.1.2）"
+        required: true
+        type: string
+      platforms:
+        description: "目标架构（arm64 取决于基础镜像支持）"
+        required: true
+        default: "linux/amd64"
+        type: choice
+        options:
+          - linux/amd64
+          - linux/amd64,linux/arm64
+
+permissions:
+  contents: write
+  packages: write
+
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: "24.22.1"
+  PNPM_VERSION: "12.15.0"
+  REGISTRY: ghcr.io
+
+jobs:
+  # 1) 质量门禁：格式/类型/lint/knip/测试全部通过才允许发布
+  quality:
+    name: 质量门禁
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - name: 安装依赖
+        run: pnpm install --frozen-lockfile
+      - name: 格式 / Lint / 类型检查
+        run: pnpm exec vp check
+      - name: 未使用代码检查
+        run: pnpm exec vp run knip
+      - name: 单元 + 集成测试
+        run: pnpm exec vp test
+
+  # 2) 构建并推送镜像（GHCR）
+  publish-image:
+    name: 构建并推送镜像
+    needs: quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+      image: ${{ steps.image.outputs.image }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - name: 计算镜像地址（GHCR 要求小写）
+        id: image
+        run: |
+          set -euo pipefail
+          image="${{ env.REGISTRY }}/$(printf '%s' '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')"
+          echo "image=$image" >> "$GITHUB_OUTPUT"
+          echo "镜像: $image"
+
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - name: 登录 GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 生成镜像标签与 OCI 标签
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.image.outputs.image }}
+          tags: |
+            type=ref,event=tag
+            type=semver,pattern={{version}}
+            type=raw,value=${{ github.event.inputs.tag }},enable=${{ github.event_name == 'workflow_dispatch' }}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' }}
+
+      - name: 构建并推送
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: ${{ github.event.inputs.platforms || 'linux/amd64' }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            APP_VERSION=${{ github.event.inputs.tag || github.ref_name }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: true
+          sbom: true
+
+  # 3) 创建 Release 并上传一键部署资产
+  release:
+    name: 发布 Release
+    needs: publish-image
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+          fetch-depth: 0
+
+      - name: 组装发布资产
+        run: |
+          set -euo pipefail
+          version="${{ env.RELEASE_TAG }}"
+          mkdir -p release
+          cp deploy/docker-compose.release.yml release/docker-compose.yml
+          cp deploy/env.release.example release/env.example
+          cp scripts/ops.sh release/handoverkit-ops.sh
+          cp docs/release-and-ops.md release/DEPLOY.md
+          chmod +x release/handoverkit-ops.sh
+
+          # 把默认镜像 tag 固定成本次发布版本，避免 latest 漂移
+          sed -i "s/^DEFAULT_IMAGE_TAG=.*/DEFAULT_IMAGE_TAG=\"${version}\"/" release/handoverkit-ops.sh
+          sed -i "s/:latest/:${version}/g" release/env.example
+
+          tar -czf "release/handoverkit-deploy-${version}.tar.gz" -C release docker-compose.yml env.example handoverkit-ops.sh DEPLOY.md
+          cd release
+          sha256sum docker-compose.yml env.example handoverkit-ops.sh DEPLOY.md "handoverkit-deploy-${version}.tar.gz" > checksums.txt
+          ls -la
+
+      - name: 创建 GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: 易交接 ${{ env.RELEASE_TAG }}
+          generate_release_notes: true
+          append_body: true
+          fail_on_unmatched_files: true
+          body: |
+            ## 一键安装（Linux + Docker，推荐）
+
+            ```bash
+            curl -fsSL https://github.com/${{ github.repository }}/releases/latest/download/handoverkit-ops.sh -o /tmp/ops.sh
+            sudo bash /tmp/ops.sh install
+            ```
+
+            安装完成后脚本会输出访问地址与初始管理员账号；数据保存在 Docker 卷 handoverkit_data。
+
+            ## 发布资产
+
+            | 文件 | 说明 |
+            | --- | --- |
+            | handoverkit-ops.sh | 一键安装 / 升级 / 备份 / 恢复 / 日志 / 状态 |
+            | docker-compose.yml | 1Panel / 手动 Compose 部署用（不含构建，直接拉镜像） |
+            | env.example | 环境变量模板 |
+            | handoverkit-deploy-${{ env.RELEASE_TAG }}.tar.gz | 以上文件打包 |
+            | checksums.txt | SHA256 校验和 |
+
+            ## Docker 镜像
+
+            - 镜像：${{ needs.publish-image.outputs.image }}:${{ env.RELEASE_TAG }}
+            - Digest：${{ needs.publish-image.outputs.digest }}
+            - 架构：${{ github.event.inputs.platforms || 'linux/amd64' }}
+
+            > 若 GHCR 包为私有，请先在服务器执行 docker login ghcr.io（GitHub PAT 勾选 read:packages），或在包设置中改为 public。
+          files: |
+            release/handoverkit-ops.sh
+            release/docker-compose.yml
+            release/env.example
+            release/DEPLOY.md
+            release/handoverkit-deploy-*.tar.gz
+            release/checksums.txt

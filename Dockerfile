@@ -20,6 +20,13 @@ RUN cp "$(vp env which node | head -1)" /tmp/node
 
 # ---- 运行阶段：仅 Node + 构建产物；SQLite 数据落在 /data 卷 ----
 FROM debian:trixie-slim AS runtime
+ARG APP_VERSION=dev
+LABEL org.opencontainers.image.title="易交接 HandoverKit" \
+      org.opencontainers.image.description="医疗用物与交接记录系统（React + Hono + oRPC + SQLite）" \
+      org.opencontainers.image.source="https://github.com/Eunsolfs/HandoverKit" \
+      org.opencontainers.image.url="https://github.com/Eunsolfs/HandoverKit" \
+      org.opencontainers.image.version="${APP_VERSION}" \
+      org.opencontainers.image.licenses="MIT"
 WORKDIR /app
 
 ENV NODE_ENV=production \

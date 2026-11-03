@@ -1,0 +1,69 @@
+# 易交接 HandoverKit — 生产部署（直接拉取 GHCR 镜像，不在服务器构建）
+#
+# 一键方式（推荐）：使用 Release 里的 handoverkit-ops.sh install
+# 手动方式：
+#   1. cp env.example .env 并填写 BETTER_AUTH_URL / BETTER_AUTH_SECRET
+#   2. docker compose pull
+#   3. docker compose up -d
+#   4. 浏览器打开 BETTER_AUTH_URL
+#
+# 1Panel：容器 -> 编排 -> 创建编排，粘贴本文件；环境变量在 1Panel 界面或 .env 中配置。
+
+name: handoverkit
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-app: &app
+  image: "${HK_IMAGE:-ghcr.io/eunsolfs/handoverkit:latest}"
+  environment:
+    # 浏览器访问的完整地址，必须与用户实际打开的地址一致（HTTPS 反代时填 https://域名）
+    BETTER_AUTH_URL: "${BETTER_AUTH_URL:?请在 .env 中设置 BETTER_AUTH_URL}"
+    # >=32 字符随机串：openssl rand -hex 32
+    BETTER_AUTH_SECRET: "${BETTER_AUTH_SECRET:?请在 .env 中设置 BETTER_AUTH_SECRET}"
+    DATABASE_URL: /data/app.db
+    PORT: "3000"
+    TZ: "${TZ:-Asia/Shanghai}"
+    SEED_ADMIN_USERNAME: "${SEED_ADMIN_USERNAME:-admin}"
+    SEED_ADMIN_PASSWORD: "${SEED_ADMIN_PASSWORD:-Admin@123456}"
+    SEED_ADMIN_NAME: "${SEED_ADMIN_NAME:-系统管理员}"
+    NODE_ENV: production
+  volumes:
+    - data:/data
+  logging: *logging
+  init: true
+  stop_grace_period: 30s
+
+services:
+  # 一次性迁移：执行 dist/migrate.mjs 后退出，app 等待其成功
+  migrate:
+    <<: *app
+    command: ["node", "dist/migrate.mjs"]
+    restart: "no"
+
+  app:
+    <<: *app
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    ports:
+      - "${APP_PORT:-8080}:3000"
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/api/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+
+volumes:
+  data:

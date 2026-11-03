@@ -1,3 +1,5 @@
+> **推荐**：如果使用 GitHub Release 提供的镜像，可直接看 [发布自动化与一键运维](release-and-ops.md)，用 `handoverkit-ops.sh install` 一条命令完成安装；本文保留手动 Compose / 1Panel 编排与源码构建的完整步骤。
+
 # 易交接 —— 1Panel / Docker Compose 部署手册
 
 > 适用版本：HandoverKit v1（M5）。目标环境：单机 1Panel（Docker + Compose）、SQLite。
