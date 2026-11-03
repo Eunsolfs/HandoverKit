@@ -10,24 +10,30 @@ import {
   DropdownMenuTrigger,
 } from "@handoverkit/ui/components/dropdown-menu";
 
+const THEME_OPTIONS = [
+  { label: "浅色", value: "light" },
+  { label: "深色", value: "dark" },
+  { label: "跟随系统", value: "system" },
+];
+
 export const ModeToggle = () => {
-  const { theme, setTheme } = useTheme();
+  const { setTheme, theme } = useTheme();
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        render={
-          <Button aria-label="Toggle theme" size="icon" variant="ghost" />
-        }
+        render={<Button aria-label="切换主题" size="icon" variant="ghost" />}
       >
         <SunIcon className="dark:hidden" />
         <MoonIcon className="hidden dark:block" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuRadioGroup onValueChange={setTheme} value={theme}>
-          <DropdownMenuRadioItem value="light">Light</DropdownMenuRadioItem>
-          <DropdownMenuRadioItem value="dark">Dark</DropdownMenuRadioItem>
-          <DropdownMenuRadioItem value="system">System</DropdownMenuRadioItem>
+          {THEME_OPTIONS.map((option) => (
+            <DropdownMenuRadioItem key={option.value} value={option.value}>
+              {option.label}
+            </DropdownMenuRadioItem>
+          ))}
         </DropdownMenuRadioGroup>
       </DropdownMenuContent>
     </DropdownMenu>

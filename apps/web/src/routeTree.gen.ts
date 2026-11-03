@@ -9,18 +9,22 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as IndexRouteImport } from './routes/index'
-import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
+import { Route as AppRouteImport } from './routes/_app'
 import { Route as LoginRouteImport } from './routes/login'
-import { Route as AuthenticatedTodosRouteImport } from './routes/_authenticated/todos'
+import { Route as AppIndexRouteImport } from './routes/_app/index'
+import { Route as AppScanRouteImport } from './routes/_app/scan'
+import { Route as ScanTokenRouteImport } from './routes/scan/$token'
+import { Route as AppAdminItemsRouteImport } from './routes/_app/admin/items'
+import { Route as AppAdminMattersRouteImport } from './routes/_app/admin/matters'
+import { Route as AppAdminStatsRouteImport } from './routes/_app/admin/stats'
+import { Route as AppAdminTeamsRouteImport } from './routes/_app/admin/teams'
+import { Route as AppAdminUsersRouteImport } from './routes/_app/admin/users'
+import { Route as AppRecordsIndexRouteImport } from './routes/_app/records/index'
+import { Route as AppRecordsRecordIdRouteImport } from './routes/_app/records/$recordId'
+import { Route as AppUsageIndexRouteImport } from './routes/_app/usage/index'
 
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthenticatedRoute = AuthenticatedRouteImport.update({
-  id: '/_authenticated',
+const AppRoute = AppRouteImport.update({
+  id: '/_app',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -28,57 +32,165 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedTodosRoute = AuthenticatedTodosRouteImport.update({
-  id: '/todos',
-  path: '/todos',
-  getParentRoute: () => AuthenticatedRoute,
+const AppIndexRoute = AppIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppScanRoute = AppScanRouteImport.update({
+  id: '/scan',
+  path: '/scan',
+  getParentRoute: () => AppRoute,
+} as any)
+const ScanTokenRoute = ScanTokenRouteImport.update({
+  id: '/scan/$token',
+  path: '/scan/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AppAdminItemsRoute = AppAdminItemsRouteImport.update({
+  id: '/admin/items',
+  path: '/admin/items',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAdminMattersRoute = AppAdminMattersRouteImport.update({
+  id: '/admin/matters',
+  path: '/admin/matters',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAdminStatsRoute = AppAdminStatsRouteImport.update({
+  id: '/admin/stats',
+  path: '/admin/stats',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAdminTeamsRoute = AppAdminTeamsRouteImport.update({
+  id: '/admin/teams',
+  path: '/admin/teams',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAdminUsersRoute = AppAdminUsersRouteImport.update({
+  id: '/admin/users',
+  path: '/admin/users',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppRecordsIndexRoute = AppRecordsIndexRouteImport.update({
+  id: '/records/',
+  path: '/records/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppRecordsRecordIdRoute = AppRecordsRecordIdRouteImport.update({
+  id: '/records/$recordId',
+  path: '/records/$recordId',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppUsageIndexRoute = AppUsageIndexRouteImport.update({
+  id: '/usage/',
+  path: '/usage/',
+  getParentRoute: () => AppRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
+  '/': typeof AppIndexRoute
   '/login': typeof LoginRoute
-  '/todos': typeof AuthenticatedTodosRoute
+  '/scan': typeof AppScanRoute
+  '/scan/$token': typeof ScanTokenRoute
+  '/admin/items': typeof AppAdminItemsRoute
+  '/admin/matters': typeof AppAdminMattersRoute
+  '/admin/stats': typeof AppAdminStatsRoute
+  '/admin/teams': typeof AppAdminTeamsRoute
+  '/admin/users': typeof AppAdminUsersRoute
+  '/records/$recordId': typeof AppRecordsRecordIdRoute
+  '/records/': typeof AppRecordsIndexRoute
+  '/usage/': typeof AppUsageIndexRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
   '/login': typeof LoginRoute
-  '/todos': typeof AuthenticatedTodosRoute
+  '/scan': typeof AppScanRoute
+  '/scan/$token': typeof ScanTokenRoute
+  '/': typeof AppIndexRoute
+  '/admin/items': typeof AppAdminItemsRoute
+  '/admin/matters': typeof AppAdminMattersRoute
+  '/admin/stats': typeof AppAdminStatsRoute
+  '/admin/teams': typeof AppAdminTeamsRoute
+  '/admin/users': typeof AppAdminUsersRoute
+  '/records/$recordId': typeof AppRecordsRecordIdRoute
+  '/records': typeof AppRecordsIndexRoute
+  '/usage': typeof AppUsageIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
-  '/_authenticated': typeof AuthenticatedRouteWithChildren
+  '/_app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
-  '/_authenticated/todos': typeof AuthenticatedTodosRoute
+  '/_app/scan': typeof AppScanRoute
+  '/scan/$token': typeof ScanTokenRoute
+  '/_app/': typeof AppIndexRoute
+  '/_app/admin/items': typeof AppAdminItemsRoute
+  '/_app/admin/matters': typeof AppAdminMattersRoute
+  '/_app/admin/stats': typeof AppAdminStatsRoute
+  '/_app/admin/teams': typeof AppAdminTeamsRoute
+  '/_app/admin/users': typeof AppAdminUsersRoute
+  '/_app/records/$recordId': typeof AppRecordsRecordIdRoute
+  '/_app/records/': typeof AppRecordsIndexRoute
+  '/_app/usage/': typeof AppUsageIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/login' | '/todos'
+  fullPaths:
+    | '/'
+    | '/login'
+    | '/scan'
+    | '/scan/$token'
+    | '/admin/items'
+    | '/admin/matters'
+    | '/admin/stats'
+    | '/admin/teams'
+    | '/admin/users'
+    | '/records/$recordId'
+    | '/records/'
+    | '/usage/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login' | '/todos'
-  id: '__root__' | '/' | '/_authenticated' | '/login' | '/_authenticated/todos'
+  to:
+    | '/login'
+    | '/scan'
+    | '/scan/$token'
+    | '/'
+    | '/admin/items'
+    | '/admin/matters'
+    | '/admin/stats'
+    | '/admin/teams'
+    | '/admin/users'
+    | '/records/$recordId'
+    | '/records'
+    | '/usage'
+  id:
+    | '__root__'
+    | '/_app'
+    | '/login'
+    | '/_app/scan'
+    | '/scan/$token'
+    | '/_app/'
+    | '/_app/admin/items'
+    | '/_app/admin/matters'
+    | '/_app/admin/stats'
+    | '/_app/admin/teams'
+    | '/_app/admin/users'
+    | '/_app/records/$recordId'
+    | '/_app/records/'
+    | '/_app/usage/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
-  AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
+  AppRoute: typeof AppRouteWithChildren
   LoginRoute: typeof LoginRoute
+  ScanTokenRoute: typeof ScanTokenRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/_authenticated': {
-      id: '/_authenticated'
+    '/_app': {
+      id: '/_app'
       path: ''
       fullPath: '/'
-      preLoaderRoute: typeof AuthenticatedRouteImport
+      preLoaderRoute: typeof AppRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -88,32 +200,118 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/todos': {
-      id: '/_authenticated/todos'
-      path: '/todos'
-      fullPath: '/todos'
-      preLoaderRoute: typeof AuthenticatedTodosRouteImport
-      parentRoute: typeof AuthenticatedRoute
+    '/_app/': {
+      id: '/_app/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof AppIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/scan': {
+      id: '/_app/scan'
+      path: '/scan'
+      fullPath: '/scan'
+      preLoaderRoute: typeof AppScanRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/scan/$token': {
+      id: '/scan/$token'
+      path: '/scan/$token'
+      fullPath: '/scan/$token'
+      preLoaderRoute: typeof ScanTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_app/admin/items': {
+      id: '/_app/admin/items'
+      path: '/admin/items'
+      fullPath: '/admin/items'
+      preLoaderRoute: typeof AppAdminItemsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/admin/matters': {
+      id: '/_app/admin/matters'
+      path: '/admin/matters'
+      fullPath: '/admin/matters'
+      preLoaderRoute: typeof AppAdminMattersRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/admin/stats': {
+      id: '/_app/admin/stats'
+      path: '/admin/stats'
+      fullPath: '/admin/stats'
+      preLoaderRoute: typeof AppAdminStatsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/admin/teams': {
+      id: '/_app/admin/teams'
+      path: '/admin/teams'
+      fullPath: '/admin/teams'
+      preLoaderRoute: typeof AppAdminTeamsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/admin/users': {
+      id: '/_app/admin/users'
+      path: '/admin/users'
+      fullPath: '/admin/users'
+      preLoaderRoute: typeof AppAdminUsersRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/records/': {
+      id: '/_app/records/'
+      path: '/records'
+      fullPath: '/records/'
+      preLoaderRoute: typeof AppRecordsIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/records/$recordId': {
+      id: '/_app/records/$recordId'
+      path: '/records/$recordId'
+      fullPath: '/records/$recordId'
+      preLoaderRoute: typeof AppRecordsRecordIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/usage/': {
+      id: '/_app/usage/'
+      path: '/usage'
+      fullPath: '/usage/'
+      preLoaderRoute: typeof AppUsageIndexRouteImport
+      parentRoute: typeof AppRoute
     }
   }
 }
 
-interface AuthenticatedRouteChildren {
-  AuthenticatedTodosRoute: typeof AuthenticatedTodosRoute
+interface AppRouteChildren {
+  AppScanRoute: typeof AppScanRoute
+  AppIndexRoute: typeof AppIndexRoute
+  AppAdminItemsRoute: typeof AppAdminItemsRoute
+  AppAdminMattersRoute: typeof AppAdminMattersRoute
+  AppAdminStatsRoute: typeof AppAdminStatsRoute
+  AppAdminTeamsRoute: typeof AppAdminTeamsRoute
+  AppAdminUsersRoute: typeof AppAdminUsersRoute
+  AppRecordsRecordIdRoute: typeof AppRecordsRecordIdRoute
+  AppRecordsIndexRoute: typeof AppRecordsIndexRoute
+  AppUsageIndexRoute: typeof AppUsageIndexRoute
 }
 
-const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
-  AuthenticatedTodosRoute: AuthenticatedTodosRoute,
+const AppRouteChildren: AppRouteChildren = {
+  AppScanRoute: AppScanRoute,
+  AppIndexRoute: AppIndexRoute,
+  AppAdminItemsRoute: AppAdminItemsRoute,
+  AppAdminMattersRoute: AppAdminMattersRoute,
+  AppAdminStatsRoute: AppAdminStatsRoute,
+  AppAdminTeamsRoute: AppAdminTeamsRoute,
+  AppAdminUsersRoute: AppAdminUsersRoute,
+  AppRecordsRecordIdRoute: AppRecordsRecordIdRoute,
+  AppRecordsIndexRoute: AppRecordsIndexRoute,
+  AppUsageIndexRoute: AppUsageIndexRoute,
 }
 
-const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
-  AuthenticatedRouteChildren,
-)
+const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
-  AuthenticatedRoute: AuthenticatedRouteWithChildren,
+  AppRoute: AppRouteWithChildren,
   LoginRoute: LoginRoute,
+  ScanTokenRoute: ScanTokenRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
