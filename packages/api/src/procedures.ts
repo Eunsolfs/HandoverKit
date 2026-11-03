@@ -50,8 +50,3 @@ export const superAdminProcedure = protectedProcedure.use(
     return next();
   }
 );
-
-export type ProtectedContext = Context & {
-  session: NonNullable<Context["session"]>;
-  user: NonNullable<Context["user"]>;
-};

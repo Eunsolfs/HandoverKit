@@ -1,5 +1,5 @@
 import { ORPCError } from "@orpc/server";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
 import { matter, team } from "@handoverkit/db/schema/handover";
 
@@ -10,18 +10,6 @@ export const isSuperAdmin = (profile: Profile) =>
 
 export const isAdmin = (profile: Profile) =>
   profile.role === "super_admin" || profile.role === "team_admin";
-
-export const requireAdmin = (profile: Profile) => {
-  if (!isAdmin(profile)) {
-    throw new ORPCError("FORBIDDEN", { message: "需要管理员权限" });
-  }
-};
-
-export const requireSuperAdmin = (profile: Profile) => {
-  if (!isSuperAdmin(profile)) {
-    throw new ORPCError("FORBIDDEN", { message: "需要超级管理员权限" });
-  }
-};
 
 /**
  * 解析本次请求操作的团队：
@@ -118,12 +106,3 @@ export const assertMatterAccess = async (
 
   return row;
 };
-
-/** 团队管理员只能操作本团队；超级管理员不受限。 */
-export const assertTeamAdminScope = (profile: Profile, teamId: string) => {
-  requireAdmin(profile);
-  assertTeamAccess(profile, teamId);
-};
-
-export const matterTeamFilter = (teamId: string) =>
-  and(eq(matter.teamId, teamId));

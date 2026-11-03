@@ -9,86 +9,78 @@ import {
 import { matter, team } from "@handoverkit/db/schema/handover";
 
 import { isSuperAdmin } from "#src/authz.ts";
-import type { Profile } from "#src/context.ts";
+import { toProfileDto } from "#src/dto.ts";
+import type { TeamDto } from "#src/dto.ts";
+import { todayInTimeZone } from "#src/lib/dates.ts";
+import { loadMatterDtos, loadTeamDto, loadTeamDtos } from "#src/lib/loaders.ts";
 import { protectedProcedure } from "#src/procedures.ts";
 
-const teamDto = (row: typeof team.$inferSelect) => ({
-  code: row.code,
-  createdAt: row.createdAt,
-  description: row.description,
-  id: row.id,
-  memberCount: 0,
-  matterCount: 0,
-  name: row.name,
-  status: row.status,
-  timezone: row.timezone,
-});
-
-const profileDto = (profile: Profile) => ({
-  email: profile.email,
-  id: profile.id,
-  name: profile.name,
-  phone: profile.phone,
-  role: profile.role,
-  status: profile.status,
-  teamId: profile.teamId,
-  username: profile.username ?? "",
-});
-
+/** 当前用户资料 + 所在/当前团队 + 可访问交接事项。超级管理员可传 teamId 切换团队。 */
 export const meRouter = {
-  get: protectedProcedure.handler(({ context }) => {
-    const profile = context.user;
+  get: protectedProcedure
+    .input(z.object({ teamId: z.string().min(1).optional() }).optional())
+    .handler(({ context, input }) => {
+      const profile = context.user;
 
-    const teams = isSuperAdmin(profile)
-      ? context.db.select().from(team).orderBy(team.createdAt).all()
-      : [];
+      const teams = isSuperAdmin(profile)
+        ? loadTeamDtos(
+            context.db,
+            context.db.select().from(team).orderBy(team.createdAt).all()
+          )
+        : [];
 
-    const teamId = profile.teamId ?? teams[0]?.id ?? null;
+      const requestedTeamId = input?.teamId ?? null;
 
-    const currentTeam =
-      teamId === null
-        ? null
-        : (context.db
-            .select()
-            .from(team)
-            .where(eq(team.id, teamId))
-            .limit(1)
-            .all()[0] ?? null);
+      if (
+        requestedTeamId !== null &&
+        !isSuperAdmin(profile) &&
+        requestedTeamId !== profile.teamId
+      ) {
+        throw new ORPCError("NOT_FOUND", { message: "团队不存在" });
+      }
 
-    const matters =
-      teamId === null
-        ? []
-        : context.db
-            .select()
-            .from(matter)
-            .where(eq(matter.teamId, teamId))
-            .orderBy(matter.createdAt)
-            .all();
+      const teamId = requestedTeamId ?? profile.teamId ?? teams[0]?.id ?? null;
 
-    return {
-      matters: matters.map((row) => ({
-        code: row.code,
-        createdAt: row.createdAt,
-        description: row.description,
-        id: row.id,
-        itemCount: 0,
-        name: row.name,
-        qrChangedAt: row.qrChangedAt,
-        qrToken: row.qrToken,
-        qrVersion: row.qrVersion,
-        status: row.status,
-        teamId: row.teamId,
-        teamName: currentTeam?.name ?? "",
-        todayStatus: null,
-      })),
-      team: currentTeam ? teamDto(currentTeam) : null,
-      teams: teams.map(teamDto),
-      user: {
-        ...profileDto(profile),
-        teamName: currentTeam?.name ?? null,
-      },
-    };
-  }),
+      let currentTeam: TeamDto | null = null;
+
+      if (teamId !== null) {
+        const [row] = context.db
+          .select()
+          .from(team)
+          .where(eq(team.id, teamId))
+          .limit(1)
+          .all();
+
+        if (row !== undefined) {
+          currentTeam = loadTeamDto(context.db, row);
+        }
+      }
+
+      const recordDate = todayInTimeZone(
+        currentTeam?.timezone ?? "Asia/Shanghai"
+      );
+
+      const matters =
+        teamId === null
+          ? []
+          : loadMatterDtos(
+              context.db,
+              context.db
+                .select()
+                .from(matter)
+                .where(eq(matter.teamId, teamId))
+                .orderBy(matter.createdAt)
+                .all(),
+              recordDate
+            );
+
+      return {
+        matters,
+        team: currentTeam,
+        teams,
+        user: toProfileDto(profile, currentTeam?.name ?? null),
+      };
+    }),
 
   changePassword: protectedProcedure
     .input(

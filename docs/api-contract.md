@@ -243,7 +243,7 @@ interface StatsOverviewDto {
 
 | Procedure           | 入参                               | 返回                               | 权限                                            |
 | ------------------- | ---------------------------------- | ---------------------------------- | ----------------------------------------------- |
-| `me.get`            | —                                  | `{ user: ProfileDto; team: TeamDto | null; teams: TeamDto[]; matters: MatterDto[] }` | 登录 |
+| `me.get`            | `{ teamId? }`                      | `{ user: ProfileDto; team: TeamDto | null; teams: TeamDto[]; matters: MatterDto[] }` | 登录；超级管理员传 teamId 切换团队 |
 | `me.changePassword` | `{ currentPassword, newPassword }` | `{ ok: true }`                     | 登录（本人）                                    |
 
 ### 4.2 teams（超级管理员）
@@ -278,15 +278,15 @@ interface StatsOverviewDto {
 
 ### 4.5 items
 
-| Procedure         | 入参                                                                              | 返回                                | 权限                                                   |
-| ----------------- | --------------------------------------------------------------------------------- | ----------------------------------- | ------------------------------------------------------ |
-| `items.list`      | `{ matterId, includeArchived? }`                                                  | `ItemDto[]`                         | 登录（团队隔离）                                       |
-| `items.create`    | `{ matterId, name, spec?, unit, category?, stock?, minStock?, location?, note? }` | `ItemDto`                           | 管理员；stock>0 写 initial 流水                        |
-| `items.update`    | `{ id, name?, spec?, unit?, category?, minStock?, location?, note?, status? }`    | `ItemDto`                           | 管理员（不允许直接改 stock）                           |
-| `items.inbound`   | `{ id, quantity, note? }`                                                         | `ItemDto`                           | 管理员；库存 + quantity，写 inbound 流水               |
-| `items.adjust`    | `{ id, quantityDelta, note }`                                                     | `ItemDto`                           | 管理员；盘点/异常调整，reason 必填，写 adjustment 流水 |
-| `items.movements` | `{ itemId }`                                                                      | `StockMovementDto[]`（最多 100 条） | 登录（团队隔离）                                       |
-| `items.remove`    | `{ id }`                                                                          | `{ ok: true }`                      | 管理员；有流水/明细时只能停用（`CONFLICT`）            |
+| Procedure         | 入参                                                                              | 返回                                | 权限                                                                                       |
+| ----------------- | --------------------------------------------------------------------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------ |
+| `items.list`      | `{ matterId, includeArchived? }`                                                  | `ItemDto[]`                         | 登录（团队隔离）                                                                           |
+| `items.create`    | `{ matterId, name, spec?, unit, category?, stock?, minStock?, location?, note? }` | `ItemDto`                           | 管理员；stock>0 写 initial 流水                                                            |
+| `items.update`    | `{ id, name?, spec?, unit?, category?, minStock?, location?, note?, status? }`    | `ItemDto`                           | 管理员（不允许直接改 stock）                                                               |
+| `items.inbound`   | `{ id, quantity, note? }`                                                         | `ItemDto`                           | 管理员；库存 + quantity，写 inbound 流水                                                   |
+| `items.adjust`    | `{ id, quantityDelta, note }`                                                     | `ItemDto`                           | 管理员；盘点/异常调整，reason 必填，写 adjustment 流水                                     |
+| `items.movements` | `{ itemId }`                                                                      | `StockMovementDto[]`（最多 100 条） | 登录（团队隔离）                                                                           |
+| `items.remove`    | `{ id }`                                                                          | `{ ok: true }`                      | 管理员；有 usage_item / stock_movement / handover_record_item 快照时只能停用（`CONFLICT`） |
 
 ### 4.6 records（交接记录）
 
@@ -303,14 +303,14 @@ interface StatsOverviewDto {
 
 ### 4.7 usage（用物消耗）
 
-| Procedure              | 入参                                                                                                                            | 返回                                  | 权限                   |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- | ---------------------- |
-| `usage.list`           | `{ matterId?, teamId?, from?, to?, status?, page?, pageSize? }`                                                                 | 分页 `UsageDto[]`                     | 登录（团队隔离）       |
-| `usage.get`            | `{ id }`                                                                                                                        | `UsageDto`                            | 登录                   |
-| `usage.create`         | `{ matterId, usedAt, patientName, patientType, patientNo, patientPhone?, operatorName?, note?, items: { itemId, quantity }[] }` | `UsageDto`                            | 登录；事务扣库存       |
-| `usage.requestRevoke`  | `{ id, reason }`                                                                                                                | `RevokeRequestDto`                    | 记录所属团队成员       |
-| `usage.pendingRevokes` | `{ teamId? }`                                                                                                                   | `RevokeRequestDto[]`（含 usage 摘要） | 管理员                 |
-| `usage.reviewRevoke`   | `{ requestId, approve, note? }`                                                                                                 | `UsageDto`                            | 管理员；通过则恢复库存 |
+| Procedure              | 入参                                                                                                                            | 返回                                  | 权限                                                                          |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- | ----------------------------------------------------------------------------- |
+| `usage.list`           | `{ matterId?, teamId?, from?, to?, status?, page?, pageSize? }`                                                                 | 分页 `UsageDto[]`                     | 登录（团队隔离）                                                              |
+| `usage.get`            | `{ id }`                                                                                                                        | `UsageDto`                            | 登录                                                                          |
+| `usage.create`         | `{ matterId, usedAt, patientName, patientType, patientNo, patientPhone?, operatorName?, note?, items: { itemId, quantity }[] }` | `UsageDto`                            | 登录；事务扣库存                                                              |
+| `usage.requestRevoke`  | `{ id, reason }`                                                                                                                | `RevokeRequestDto`                    | 记录所属团队成员                                                              |
+| `usage.pendingRevokes` | `{ teamId? }`                                                                                                                   | `RevokeRequestDto[]`（含 usage 摘要） | 管理员                                                                        |
+| `usage.reviewRevoke`   | `{ requestId, approve, note? }`                                                                                                 | `UsageDto`                            | 管理员；通过则恢复库存并置 revoked；驳回则 usage 恢复 active、申请置 rejected |
 
 ### 4.8 exceptions
 
@@ -326,7 +326,7 @@ interface StatsOverviewDto {
 | ---------------- | ---------------------------------------------------------------------- | ------------------ | ------ |
 | `stats.overview` | `{ teamId?, matterId?, period: "week"\|"month"\|"year", anchorDate? }` | `StatsOverviewDto` | 管理员 |
 
-统计口径：只统计 `status = active` 的消耗记录；`quantity` 为物品件数合计；`byItem.share` 为数量占比（0-1，保留 4 位）；周期按团队时区自然周（周一至周日）/自然月/自然年。
+统计口径：统计 `status in ('active','revoke_pending')` 的消耗记录（待审批撤销未生效，仍计入；已批准撤销的 `revoked` 排除）；`quantity` 为物品件数合计；`byItem.share` 为数量占比（0-1，保留 4 位）；周期按团队时区自然周（周一至周日）/自然月/自然年。
 
 ## 5. 服务端权限实现约定
 
