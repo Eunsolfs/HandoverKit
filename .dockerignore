@@ -14,3 +14,11 @@
 **/test-results
 **/.env
 **/.env.*
+
+# 本地工具链与缓存，不进构建上下文
+.tools
+.npm-cache
+.pnpm-store
+.vite-hooks
+.vscode
+.DS_Store

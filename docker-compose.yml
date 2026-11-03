@@ -1,18 +1,43 @@
 name: handoverkit
 
+# 1Panel「容器」→「编排」→「创建编排」可直接粘贴本文件。
+# 先复制根目录 .env.example 为 .env 并填写 BETTER_AUTH_SECRET / BETTER_AUTH_URL，
+# 再执行 docker compose up -d --build；迁移由 migrate 服务在应用启动前自动完成。
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 x-app: &app
-  build: .
-  image: handoverkit
+  build:
+    context: .
+  image: handoverkit:${APP_VERSION:-latest}
   environment:
+    # 浏览器访问的站点地址（生产为 https://域名），必须与反向代理对外地址一致
     BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}
-    BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?set BETTER_AUTH_SECRET}
+    # 必填；生成：openssl rand -base64 32
+    BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?请先在 .env 中设置 BETTER_AUTH_SECRET}
+    DATABASE_URL: /data/app.db
+    PORT: "3000"
+    TZ: ${TZ:-Asia/Shanghai}
+    # 仅当系统内不存在超级管理员时创建；登录后请立即修改密码
+    SEED_ADMIN_USERNAME: ${SEED_ADMIN_USERNAME:-admin}
+    SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-Admin@123456}
+    SEED_ADMIN_NAME: ${SEED_ADMIN_NAME:-系统管理员}
   volumes:
     - data:/data
+  logging: *logging
+  init: true
+  stop_grace_period: 30s
 
 services:
+  # 一次性迁移：执行 packages/db 的迁移后退出，app 等待其成功
   migrate:
     <<: *app
     command: ["node", "dist/migrate.mjs"]
+    restart: "no"
 
   app:
     <<: *app
@@ -20,8 +45,20 @@ services:
       migrate:
         condition: service_completed_successfully
     ports:
-      - "3000:3000"
+      - "${APP_PORT:-3000}:3000"
     restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/api/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
 
 volumes:
   data:

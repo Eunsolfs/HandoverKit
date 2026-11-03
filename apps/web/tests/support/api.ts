@@ -14,14 +14,14 @@ const captchaSchema = z.object({
   svg: z.string(),
 });
 
-export interface CaptchaChallenge {
+interface CaptchaChallenge {
   id: string;
   svg: string;
   code: string;
 }
 
 /** 读取图形验证码；SVG 中字符以 <text> 呈现，测试里直接提取。 */
-export const fetchCaptcha = async (): Promise<CaptchaChallenge> => {
+const fetchCaptcha = async (): Promise<CaptchaChallenge> => {
   const response = await fetch(`${e2eBaseURL}/api/captcha`);
 
   if (!response.ok) {
