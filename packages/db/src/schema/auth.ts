@@ -1,5 +1,12 @@
 import { sql } from "drizzle-orm";
-import { index, integer, snakeCase, text } from "drizzle-orm/sqlite-core";
+import {
+  check,
+  index,
+  integer,
+  snakeCase,
+  text,
+  uniqueIndex,
+} from "drizzle-orm/sqlite-core";
 
 const now = sql`(cast(unixepoch('subsec') * 1000 as integer))`;
 
@@ -13,14 +20,41 @@ const timestamps = {
     .$onUpdate(() => new Date()),
 };
 
-export const user = snakeCase.table("user", {
-  email: text().notNull().unique(),
-  emailVerified: integer({ mode: "boolean" }).notNull().default(false),
-  id: text().primaryKey(),
-  image: text(),
-  name: text().notNull(),
-  ...timestamps,
-});
+export const ROLE_VALUES = ["super_admin", "team_admin", "member"] as const;
+export const USER_STATUS_VALUES = ["active", "disabled"] as const;
+
+export const user = snakeCase.table(
+  "user",
+  {
+    email: text().notNull().unique(),
+    emailVerified: integer({ mode: "boolean" }).notNull().default(false),
+    id: text().primaryKey(),
+    image: text(),
+    name: text().notNull(),
+    // Better Auth username plugin fields（插件要求的字段可空；业务创建账号时必填）
+    username: text(),
+    displayUsername: text(),
+    // 易交接业务字段（每次请求从数据库实时读取，保证停用/改角色立即生效）
+    role: text().notNull().default("member"),
+    teamId: text(),
+    status: text().notNull().default("active"),
+    phone: text(),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("user_username_unique").on(table.username),
+    index("user_team_idx").on(table.teamId),
+    check(
+      "user_role_check",
+      sql`${table.role} in ('super_admin', 'team_admin', 'member')`
+    ),
+    check("user_status_check", sql`${table.status} in ('active', 'disabled')`),
+    check(
+      "user_username_length",
+      sql`${table.username} is null or length(${table.username}) between 3 and 30`
+    ),
+  ]
+);
 
 export const session = snakeCase.table(
   "session",

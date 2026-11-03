@@ -25,7 +25,7 @@ const mount =
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
 
     const { matched, response } = await handler.handle(c.req.raw, {
-      context: { db, session },
+      context: { db, session, user: null },
       prefix,
     });
 

@@ -18,7 +18,7 @@ const LoginPage = () => {
 
   const handleSuccess = async () => {
     await router.invalidate();
-    await router.navigate({ href: search.redirect ?? "/todos" });
+    await router.navigate({ href: search.redirect ?? "/" });
   };
 
   return <AuthForm onSuccess={handleSuccess} />;
@@ -28,7 +28,7 @@ export const Route = createFileRoute("/login")({
   validateSearch,
   beforeLoad: ({ context, search }) => {
     if (context.session) {
-      throw redirect({ href: search.redirect ?? "/todos" });
+      throw redirect({ href: search.redirect ?? "/" });
     }
   },
   component: LoginPage,

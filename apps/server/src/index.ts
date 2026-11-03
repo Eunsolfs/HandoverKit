@@ -8,6 +8,9 @@ import { serveStatic } from "@hono/node-server/serve-static";
 import { app } from "#src/app.ts";
 import { db } from "#src/context.ts";
 import { env } from "#src/env.ts";
+import { ensureSeedAdmin } from "#src/seed.ts";
+
+await ensureSeedAdmin();
 
 const publicDir = fileURLToPath(new URL("public", import.meta.url));
 

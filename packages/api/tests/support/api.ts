@@ -1,13 +1,14 @@
 import { createRouterClient } from "@orpc/server";
 import { afterAll } from "vite-plus/test";
 
-import { createAuth } from "@handoverkit/auth";
+import { createAuth, createCredentialUser } from "@handoverkit/auth";
+import type { CredentialRole } from "@handoverkit/auth";
 import { createTestDatabase } from "@handoverkit/db/testing";
 
 import { appRouter } from "#src/index.ts";
 import type { Context } from "#src/index.ts";
 
-// Each test file has a database of its own, so files run in parallel and share no rows.
+// 每个测试文件使用独立数据库，文件之间并行且不共享数据。
 const { db, remove } = await createTestDatabase();
 
 afterAll(remove);
@@ -18,18 +19,36 @@ const auth = createAuth({
   secret: "test-secret-that-is-at-least-32-characters",
 });
 
-/** Calls the procedures in this process, through their middleware and validation, as the session's user. */
+/** 直接调用 procedure（走真实中间件与校验），可指定登录会话。 */
 export const createClient = (session: Context["session"] = null) =>
-  createRouterClient(appRouter, { context: { db, session } });
+  createRouterClient(appRouter, { context: { db, session, user: null } });
 
-/** Signs a new user up through Better Auth and returns a client that calls as them. */
-export const signUp = async () => {
-  const { headers } = await auth.api.signUpEmail({
-    body: {
-      email: `${crypto.randomUUID()}@example.com`,
-      name: "Test User",
-      password: "correct-horse-battery",
-    },
+let counter = 0;
+
+export interface TestUserOptions {
+  role?: CredentialRole;
+  teamId?: string | null;
+  username?: string;
+  password?: string;
+  name?: string;
+}
+
+/** 创建账号并登录，返回可直接调用 procedure 的客户端。 */
+export const createTestUser = async (options: TestUserOptions = {}) => {
+  counter += 1;
+  const username = options.username ?? `user${counter}`;
+  const password = options.password ?? "correct-horse-battery";
+
+  const userId = await createCredentialUser(db, {
+    name: options.name ?? `测试用户${counter}`,
+    password,
+    role: options.role ?? "member",
+    teamId: options.teamId ?? null,
+    username,
+  });
+
+  const { headers } = await auth.api.signInUsername({
+    body: { password, username },
     returnHeaders: true,
   });
 
@@ -38,7 +57,18 @@ export const signUp = async () => {
     .map((header) => header.split(";")[0])
     .join("; ");
 
-  return createClient(
-    await auth.api.getSession({ headers: new Headers({ cookie }) })
-  );
+  const session = await auth.api.getSession({
+    headers: new Headers({ cookie }),
+  });
+
+  return {
+    client: createClient(session),
+    cookie,
+    id: userId,
+    password,
+    session,
+    username,
+  };
 };
+
+export { auth, db };

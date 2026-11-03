@@ -12,7 +12,8 @@
   "dependencies": {
     "@better-auth/drizzle-adapter": "catalog:",
     "@handoverkit/db": "workspace:*",
-    "better-auth": "catalog:"
+    "better-auth": "catalog:",
+    "drizzle-orm": "catalog:"
   },
   "devDependencies": {
     "@handoverkit/config": "workspace:*",

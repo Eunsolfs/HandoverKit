@@ -43,6 +43,7 @@
     "typescript": "catalog:",
     "undici": "catalog:",
     "vite": "catalog:",
-    "vite-plus": "catalog:"
+    "vite-plus": "catalog:",
+    "zod": "catalog:"
   }
 }

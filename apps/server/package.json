@@ -21,6 +21,7 @@
     "@orpc/server": "catalog:",
     "@orpc/zod": "catalog:",
     "@t3-oss/env-core": "catalog:",
+    "drizzle-orm": "catalog:",
     "hono": "catalog:",
     "zod": "catalog:"
   },
