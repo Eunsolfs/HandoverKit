@@ -98,6 +98,7 @@ docker compose up -d --build
 - 数据库持久化在 Docker 数据卷 `data`（容器内 `/data/app.db`）。
 - `migrate` 服务在应用启动前自动执行迁移，升级只需重建镜像并 `docker compose up -d`。
 - 1Panel 手动步骤见 [docs/deployment-1panel.md](docs/deployment-1panel.md)。
+- 镜像构建、Release Compose、一键脚本已用 Docker Desktop（Engine 29.9.2 / Compose v5.6.1）实机验证；详见 [docs/release-and-ops.md](docs/release-and-ops.md) 的实测记录。
 
 ## 环境变量
 

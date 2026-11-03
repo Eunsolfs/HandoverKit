@@ -67,6 +67,10 @@ ask_secret() {
 
 confirm() {
   local prompt="$1" answer=""
+  if [ "${HK_YES:-0}" = "1" ]; then
+    warn "HK_YES=1，自动确认：$prompt"
+    return 0
+  fi
   if [ ! -r /dev/tty ]; then
     warn "非交互环境，默认不执行：$prompt"
     return 1
@@ -254,9 +258,14 @@ pull_image() {
   image="$(get_env HK_IMAGE "$DEFAULT_IMAGE")"
   info "拉取镜像：$image"
   if ! compose pull; then
+    if docker image inspect "$image" >/dev/null 2>&1; then
+      warn "远程拉取失败，但本地已有镜像，继续使用：$image"
+      return 0
+    fi
     warn "镜像拉取失败。常见原因："
     warn "  1) GHCR 包为私有：在服务器执行 docker login ghcr.io -u <GitHub用户名>（PAT 需 read:packages），或把包改为 public"
     warn "  2) 网络无法访问 ghcr.io：可在 .env 中把 HK_IMAGE 换成镜像加速地址或私有 registry 后重试"
+    warn "  3) 离线安装：先在本地 docker load 镜像，再重试"
     return 1
   fi
 }
@@ -350,18 +359,13 @@ cmd_upgrade() {
   need_docker
   require_installed
   copy_self
-  local target="$1" prev repo new_image
+  local target="$1" prev new_image
   [ -n "$target" ] || target="latest"
   prev="$(get_env HK_IMAGE "$DEFAULT_IMAGE")"
-  if printf '%s' "$target" | grep -q '/'; then
+  if printf '%s' "$target" | grep -qE '[:/]'; then
     new_image="$target"
   else
-    repo="${prev%:*}"
-    case "$repo" in
-      */*) ;;
-      *) repo="${DEFAULT_IMAGE%:*}" ;;
-    esac
-    new_image="$repo:$target"
+    new_image="${prev%:*}:$target"
   fi
 
   if [ "$new_image" = "$prev" ]; then
@@ -443,20 +447,28 @@ cmd_restore() {
     cmd_backup "pre-restore" || warn "恢复前备份失败（继续恢复）"
   fi
 
-  local tmp image
+  local tmp image mount_dir
   tmp="$(mktemp -d)"
-  trap 'rm -rf "$tmp"' EXIT
+  RESTORE_TMP="$tmp"
+  cleanup_restore_tmp() { rm -rf "$RESTORE_TMP"; }
+  trap cleanup_restore_tmp EXIT
   tar -xzf "$archive" -C "$tmp"
   [ -f "$tmp/app.db" ] || die "备份包中缺少 app.db"
 
   compose stop app || true
   image="$(get_env HK_IMAGE "$DEFAULT_IMAGE")"
-  docker image inspect "$image" >/dev/null 2>&1 || docker pull "$image"
+  if ! docker image inspect "$image" >/dev/null 2>&1; then
+    docker pull "$image" || die "恢复失败：镜像不可用（$image）"
+  fi
+  mount_dir="$tmp"
+  if command -v cygpath >/dev/null 2>&1; then
+    mount_dir="$(cygpath -w "$tmp")"
+  fi
   info "写入数据库文件..."
-  docker run --rm -u 0 -v "$DATA_VOLUME:/data" -v "$tmp:/restore:ro" "$image" \
+  docker run --rm -u 0 -v "$DATA_VOLUME:/data" -v "$mount_dir:/restore:ro" "$image" \
     sh -c 'cp /restore/app.db /data/app.db && rm -f /data/app.db-wal /data/app.db-shm && chown 65534:65534 /data/app.db'
   trap - EXIT
-  rm -rf "$tmp"
+  cleanup_restore_tmp
   compose up -d
   wait_health || die "恢复后健康检查失败，请查看日志。"
   info "恢复完成。"
@@ -571,6 +583,7 @@ cmd_help() {
   HK_URL=http://IP:8080                对外访问地址
   SEED_ADMIN_USERNAME / SEED_ADMIN_PASSWORD / SEED_ADMIN_NAME
   HK_REPO=Eunsolfs/HandoverKit         用于推导默认镜像地址
+  HK_YES=1                              自动化场景自动确认 restore/uninstall 等操作
 
 示例：
   sudo bash ops.sh install

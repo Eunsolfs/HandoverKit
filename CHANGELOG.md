@@ -1,5 +1,12 @@
 # 更新日志
 
+## v0.1.4（2026-11-03）Docker 实测修复
+
+- ops.sh：本地/离线镜像拉取失败时回退到本地已有镜像；restore 使用 cygpath 处理 Windows bind mount，并修复临时目录 trap 变量作用域。
+- ops.sh：支持 HK_YES=1 自动化确认；upgrade 支持完整镜像引用（如 handoverkit:local / ghcr.io/...:tag）。
+- 实测：Docker Desktop 4.97 / Engine 29.9.2 / Compose v5.6.1 下完成镜像构建、Release Compose 部署、一键安装、状态、备份、恢复、升级、回滚、卸载全流程。
+- docs/pitfalls.md 补充 Docker Desktop（Windows）踩坑与修复。
+
 ## v0.1.3（2026-11-03）交接流程状态门禁
 
 - 接班确认前：扫码页用物登记、交班表显示引导提示，后端同时拒绝 `usage.create` 与未接收状态的 `submitHandover`。

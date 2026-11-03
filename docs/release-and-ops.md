@@ -159,7 +159,21 @@ docker compose up -d
 | 升级后想回退                           | `ops.sh rollback`（保留上一次 .env 镜像配置）                                                                             |
 | 忘记管理员密码                         | 用 `docker compose exec app node ...` 重置较复杂；可用备份恢复或联系维护者（当前未提供 CLI 改密，可在登录后个人中心修改） |
 
-## 8. 本地验证脚本（不依赖 Docker）
+## 8. 实测记录（Docker Desktop）
+
+已在 Docker Desktop 4.97 / Engine 29.9.2 / Compose v5.6.1（Windows，Linux 容器）实测：
+
+- `docker build -t handoverkit:local .`：多阶段构建成功（镜像约 296 MB / 压缩 77 MB）。
+- `docker compose -f deploy/docker-compose.release.yml --env-file deploy/env.release.example config`：通过。
+- Release Compose 直接部署：migrate → app → `/api/health` 200、`/login` 200。
+- `ops.sh install`（本地镜像）：自动配置、迁移、启动、健康检查通过；登录 `admin` 成功、`me.get` 正常。
+- `ops.sh status / backup / restore / upgrade / rollback / uninstall`：全部实测通过，备份包含 `app.db` 与 `.env`。
+- 离线/本地镜像：`docker compose pull` 失败时，`ops.sh` 会自动检测本地已有镜像并继续（无需联网）。
+- 自动化场景可设置 `HK_YES=1` 自动确认 restore / uninstall 等操作（请谨慎使用）。
+
+> 注：Windows 上用 Git Bash 执行 Docker 命令时，需把 Docker Desktop 的 `resources\bin` 加入 PATH；否则会出现 `docker-credential-desktop` 找不到或路径转换问题（详见 docs/pitfalls.md）。
+
+## 9. 本地验证脚本（不依赖 Docker）
 
 ```bash
 HK_DIR=$PWD/.tmp-ops HK_DRY_RUN=1 HK_PORT=8099 HK_URL=http://127.0.0.1:8099 \

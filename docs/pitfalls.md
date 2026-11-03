@@ -123,3 +123,27 @@
 - 溢出审计：用 Playwright 遍历各宽度，比较 documentElement.scrollWidth 与 innerWidth；只查 body 溢出不够，还要检查弹窗、表格外层与长文本。
 - 开发环境截图里的 TanStack Router / React Query 调试浮层会干扰审计，生产构建已通过 import.meta.env.DEV 关闭；视觉验收以生产预览为准。
 - 真机重点：dvh 与键盘弹起、iOS 输入框字号 <16px 会触发缩放（input 在移动端用 text-base）。
+
+## 2026-11-03 Docker Desktop（Windows）实测踩坑
+
+### 19. Windows 下 Docker CLI 不在 PATH，构建报 docker-credential-desktop 找不到
+
+- 现象：`docker build` 报 `error getting credentials - exec: "docker-credential-desktop": executable file not found in %PATH%`。
+- 原因：Docker Desktop 的 CLI 与 credential helper 在安装目录的 `resources\bin`，未加入 PATH。
+- 处理：把 `C:\Users\<用户>\AppData\Local\Programs\DockerDesktop\resources\bin` 加入 PATH；Linux 服务器/CI 使用官方 docker 安装即可。
+
+### 20. Git Bash 下 restore 的临时目录 bind mount 为空
+
+- 现象：恢复时容器内 `cp /restore/app.db` 报 No such file or directory；脚本退出时还出现 `tmp: unbound variable`。
+- 原因：Git Bash 的 POSIX 临时路径不能直接作为 Windows Docker 的 bind mount；trap 在函数返回后引用了已销毁的 `local` 变量。
+- 处理：脚本内在 Windows 用 `cygpath -w` 转换挂载路径；trap 使用脚本级变量清理临时目录。Linux 下不受影响。
+
+### 21. 本地/离线镜像无法 compose pull
+
+- 现象：`docker compose pull` 对仅供本地使用的镜像返回 `pull access denied`，导致一键安装失败。
+- 处理：`ops.sh` 拉取失败时检测 `docker image inspect`，本地已有镜像则继续；离线安装可 `docker save/load` 后再执行 install。
+
+### 22. upgrade 参数为「完整镜像引用」时被误当成 tag
+
+- 现象：`ops.sh upgrade handoverkit:local` 被拼成 `ghcr.io/eunsolfs/handoverkit:handoverkit:local`（invalid reference）。
+- 处理：目标包含 `:` 或 `/` 时按完整镜像引用处理；否则按 tag 拼接当前镜像仓库。
