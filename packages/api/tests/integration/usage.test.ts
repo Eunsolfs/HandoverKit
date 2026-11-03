@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { createClient, createTestUser, db } from "../support/api.ts";
+import {
+  createClient,
+  createTestUser,
+  db,
+  ensureAcceptedRecord,
+} from "../support/api.ts";
 import {
   captureOrpcError,
   createItemFixture,
@@ -67,6 +72,7 @@ describe("usage", () => {
 
   it("登记消耗原子扣减库存并写消耗流水", async () => {
     const { gauze, listItems, matter, member, needle } = await setup();
+    await ensureAcceptedRecord(member.client, matter.id, "2026-03-01");
 
     const created = await member.client.usage.create({
       items: [
@@ -127,6 +133,7 @@ describe("usage", () => {
 
   it("库存不足整单回滚，不产生半条消耗", async () => {
     const { gauze, listItems, matter, member, needle } = await setup();
+    await ensureAcceptedRecord(member.client, matter.id, "2026-03-02");
 
     const failed = await captureOrpcError(
       member.client.usage.create({
@@ -154,6 +161,8 @@ describe("usage", () => {
 
   it("重复物品、停用物品与跨团队事项被拒绝", async () => {
     const { matter, member } = await setup();
+
+    await ensureAcceptedRecord(member.client, matter.id, "2026-03-03");
 
     const archived = createItemFixture(db, matter.id, {
       name: "停用物品",
@@ -214,10 +223,11 @@ describe("usage", () => {
   it("消耗自动关联当日交接记录并出现在记录详情", async () => {
     const { matter, member, teamAdmin } = await setup();
 
-    const record = await member.client.records.today({
-      date: "2026-03-04",
-      matterId: matter.id,
-    });
+    const record = await ensureAcceptedRecord(
+      member.client,
+      matter.id,
+      "2026-03-04"
+    );
 
     const [firstItem] = record.items;
 
@@ -257,6 +267,8 @@ describe("usage", () => {
     if (firstItem === undefined) {
       throw new Error("缺少物品");
     }
+
+    await ensureAcceptedRecord(member.client, matter.id, "2026-03-05");
 
     const created = await member.client.usage.create({
       items: [{ itemId: firstItem.id, quantity: 1 }],
@@ -308,6 +320,8 @@ describe("usage", () => {
 
   it("管理员审批通过恢复库存并写恢复流水", async () => {
     const { gauze, listItems, matter, member, teamAdmin } = await setup();
+
+    await ensureAcceptedRecord(member.client, matter.id, "2026-03-06");
 
     const created = await member.client.usage.create({
       items: [{ itemId: gauze.id, quantity: 4 }],
@@ -374,6 +388,8 @@ describe("usage", () => {
   it("驳回撤销申请后记录恢复 active 且库存不变", async () => {
     const { gauze, listItems, matter, member, teamAdmin } = await setup();
 
+    await ensureAcceptedRecord(member.client, matter.id, "2026-03-07");
+
     const created = await member.client.usage.create({
       items: [{ itemId: gauze.id, quantity: 2 }],
       matterId: matter.id,
@@ -418,6 +434,10 @@ describe("usage", () => {
     if (firstItem === undefined) {
       throw new Error("缺少物品");
     }
+
+    await ensureAcceptedRecord(member.client, matter.id, "2026-04-01");
+    await ensureAcceptedRecord(member.client, matter.id, "2026-04-02");
+    await ensureAcceptedRecord(member.client, matter.id, "2026-04-03");
 
     const usageA = await member.client.usage.create({
       items: [{ itemId: firstItem.id, quantity: 1 }],

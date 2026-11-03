@@ -74,6 +74,8 @@ describe("records", () => {
       canAccept: true,
       canDelete: false,
       canHandover: false,
+      canRegisterUsage: false,
+      requiresExceptionReport: false,
     });
     expect(first.items.map((item) => item.itemId).toSorted()).toStrictEqual(
       [gauze.id, needle.id].toSorted()
@@ -147,6 +149,8 @@ describe("records", () => {
       canAccept: false,
       canDelete: false,
       canHandover: true,
+      canRegisterUsage: true,
+      requiresExceptionReport: false,
     });
 
     const reloaded = await member.client.records.today({
@@ -163,8 +167,8 @@ describe("records", () => {
     expect(secondAccept.code).toBe("CONFLICT");
   });
 
-  it("实盘数量不一致必须填备注并自动生成异常事件", async () => {
-    const { gauze, matter, member, teamAdmin } = await setup();
+  it("实盘数量不一致必须填备注，且异常上报前禁止登记用物", async () => {
+    const { gauze, matter, member } = await setup();
 
     const record = await member.client.records.today({
       date: "2026-01-07",
@@ -193,13 +197,80 @@ describe("records", () => {
       ),
     });
 
-    expect(accepted.exceptions[0]).toMatchObject({
+    expect({
+      canRegisterUsage: accepted.permissions.canRegisterUsage,
+      diffCount: accepted.diffCount,
+      exceptions: accepted.exceptions,
+      requiresExceptionReport: accepted.permissions.requiresExceptionReport,
+    }).toStrictEqual({
+      canRegisterUsage: false,
+      diffCount: 1,
+      exceptions: [],
+      requiresExceptionReport: true,
+    });
+
+    const usageAttempt = await captureOrpcError(
+      member.client.usage.create({
+        items: [{ itemId: gauze.id, quantity: 1 }],
+        matterId: matter.id,
+        patientName: "差异患者",
+        patientNo: "D001",
+        patientType: "outpatient",
+        usedAt: "2026-01-07",
+      })
+    );
+
+    expect({
+      code: usageAttempt.code,
+      hasHint: usageAttempt.message.includes("异常上报"),
+    }).toStrictEqual({ code: "CONFLICT", hasHint: true });
+  });
+
+  it("提交异常上报后允许登记用物", async () => {
+    const { gauze, matter, member, teamAdmin } = await setup();
+
+    const record = await member.client.records.today({
+      date: "2026-01-07",
+      matterId: matter.id,
+    });
+
+    const items = checkedItems(record);
+
+    await member.client.records.accept({
+      id: record.id,
+      items: items.map((item) =>
+        item.itemId === gauze.id
+          ? { ...item, actualQty: 6, note: "少 2 包" }
+          : item
+      ),
+    });
+
+    const reported = await member.client.exceptions.create({
+      description: "接班核对发现纱布少 2 包",
       itemId: gauze.id,
-      severity: "medium",
-      status: "open",
+      matterId: matter.id,
+      recordId: record.id,
       type: "count_mismatch",
     });
-    expect(accepted.diffCount).toBe(1);
+
+    const detail = await member.client.records.get({ id: record.id });
+
+    expect(detail.exceptions.map((row) => row.id)).toContain(reported.id);
+    expect(detail.permissions).toMatchObject({
+      canRegisterUsage: true,
+      requiresExceptionReport: false,
+    });
+
+    const usage = await member.client.usage.create({
+      items: [{ itemId: gauze.id, quantity: 1 }],
+      matterId: matter.id,
+      patientName: "差异患者",
+      patientNo: "D001",
+      patientType: "outpatient",
+      usedAt: "2026-01-07",
+    });
+
+    expect(usage.recordId).toBe(record.id);
 
     const summaries = await teamAdmin.client.records.list({
       matterId: matter.id,
@@ -265,6 +336,8 @@ describe("records", () => {
     );
 
     expect(memberRemove.code).toBe("FORBIDDEN");
+
+    await member.client.records.accept({ id: record.id, items });
 
     await member.client.usage.create({
       items: [{ itemId: firstItem.itemId, quantity: 1 }],

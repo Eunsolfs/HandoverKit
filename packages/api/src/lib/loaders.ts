@@ -490,6 +490,22 @@ export const loadRecordDetail = (
     0
   );
 
+  const acceptanceDiffCount = items.reduce(
+    (total, itemRow) =>
+      total +
+      (itemRow.actualQty !== null && itemRow.actualQty !== itemRow.expectedQty
+        ? 1
+        : 0),
+    0
+  );
+
+  const requiresExceptionReport =
+    acceptanceDiffCount > 0 && exceptionRows.length === 0;
+
+  const canRegisterUsage =
+    (row.status === "accepted" || row.status === "handover_submitted") &&
+    !requiresExceptionReport;
+
   const summary = toRecordSummaryDto(
     row,
     matterNames.get(row.matterId) ?? "",
@@ -505,6 +521,8 @@ export const loadRecordDetail = (
       canAccept: row.status === "pending_acceptance",
       canDelete: isAdmin(profile) && usageRows.length === 0,
       canHandover: row.status === "accepted",
+      canRegisterUsage,
+      requiresExceptionReport,
     },
     revokeRequests: revokeRows.map(toRevokeRequestDto),
     usages: loadUsageDtos(db, usageRows),

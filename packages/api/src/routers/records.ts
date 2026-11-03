@@ -1,12 +1,9 @@
-import { randomUUID } from "node:crypto";
-
 import { ORPCError } from "@orpc/server";
 import { and, count, desc, eq, gte, lte } from "drizzle-orm";
 import { z } from "zod";
 
 import type { Database } from "@handoverkit/db";
 import {
-  exceptionEvent,
   handoverRecord,
   handoverRecordItem,
   matter,
@@ -138,13 +135,6 @@ const resolveChecklist = (
   return resolved;
 };
 
-const mismatchDescription = (line: ResolvedChecklistLine): string => {
-  const actualQty = line.actualQty ?? line.row.expectedQty;
-  const note = line.note === null ? "" : `，备注：${line.note}`;
-
-  return `${line.row.itemName}：应有 ${line.row.expectedQty} ${line.row.unit}，实盘 ${actualQty} ${line.row.unit}${note}`;
-};
-
 const loadChecklist = (db: Database, recordId: string): RecordItemRow[] =>
   db
     .select()
@@ -213,22 +203,6 @@ export const recordsRouter = {
             })
             .where(eq(handoverRecordItem.id, line.row.id))
             .run();
-
-          if (line.mismatch) {
-            tx.insert(exceptionEvent)
-              .values({
-                description: mismatchDescription(line),
-                id: randomUUID(),
-                itemId: line.row.itemId,
-                matterId: row.matterId,
-                recordId: row.id,
-                reportedByName: operatorName,
-                reportedByUserId: operatorId,
-                severity: "medium",
-                type: "count_mismatch",
-              })
-              .run();
-          }
         }
       });
 

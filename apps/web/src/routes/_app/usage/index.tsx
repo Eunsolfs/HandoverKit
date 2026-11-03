@@ -226,7 +226,7 @@ const UsageCreateDialog = ({
         <DialogHeader>
           <DialogTitle>用物消耗登记</DialogTitle>
           <DialogDescription>
-            物品只能从所选交接事项的仓库中选择，提交后立即扣减库存。
+            物品只能从所选交接事项的仓库中选择，提交后立即扣减库存。登记日期必须已完成接班核对并确认接收；如数量有差异需先在扫码页完成异常上报。
           </DialogDescription>
         </DialogHeader>
 
@@ -266,6 +266,11 @@ const UsageCreateDialog = ({
             </FormField>
 
             {itemsSection}
+            {createMutation.error === null ? null : (
+              <p className="text-destructive text-sm" role="alert">
+                {createMutation.error.message}
+              </p>
+            )}
           </div>
         )}
       </DialogContent>

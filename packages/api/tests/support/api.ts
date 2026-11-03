@@ -72,3 +72,26 @@ export const createTestUser = async (options: TestUserOptions = {}) => {
 };
 
 export { auth, db };
+
+/** 为指定日期生成并确认接收交接记录（测试辅助）；返回最新记录详情。 */
+export const ensureAcceptedRecord = async (
+  client: ReturnType<typeof createClient>,
+  matterId: string,
+  date: string
+) => {
+  const record = await client.records.today({ matterId, date });
+
+  if (record.permissions.canAccept) {
+    await client.records.accept({
+      id: record.id,
+      items: record.items.map((item) => ({
+        actualQty: item.expectedQty,
+        checked: true,
+        itemId: item.itemId,
+        note: null,
+      })),
+    });
+  }
+
+  return record;
+};

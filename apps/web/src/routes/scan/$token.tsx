@@ -16,6 +16,13 @@ import {
 } from "@handoverkit/ui/components/alert";
 import { Button } from "@handoverkit/ui/components/button";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@handoverkit/ui/components/select";
+import {
   Tabs,
   TabsContent,
   TabsList,
@@ -55,8 +62,53 @@ const isScanTab = (value: string): value is ScanTab =>
 const STATUS_HINTS = {
   accepted: "接班核对已完成，可以登记用物或提交交班表。",
   handover_submitted: "今日交班表已提交，本次交接闭环完成。",
-  pending_acceptance: "请先完成接班核对，再提交交班表。",
+  pending_acceptance: "请先完成接班核对并确认接收，才能登记用物或提交交班表。",
 } as const;
+
+const EXCEPTION_TYPE_OPTIONS = [
+  { label: "数量不符", value: "count_mismatch" },
+  { label: "物品缺失", value: "missing" },
+  { label: "物品损坏", value: "damaged" },
+  { label: "其他异常", value: "other" },
+] as const;
+
+type ExceptionTypeValue = (typeof EXCEPTION_TYPE_OPTIONS)[number]["value"];
+
+const toExceptionType = (value: string): ExceptionTypeValue =>
+  EXCEPTION_TYPE_OPTIONS.find((option) => option.value === value)?.value ??
+  "count_mismatch";
+
+const SEVERITY_OPTIONS = [
+  { label: "一般", value: "medium" },
+  { label: "严重", value: "high" },
+  { label: "轻微", value: "low" },
+] as const;
+
+type SeverityValue = (typeof SEVERITY_OPTIONS)[number]["value"];
+
+const toSeverity = (value: string): SeverityValue =>
+  SEVERITY_OPTIONS.find((option) => option.value === value)?.value ?? "medium";
+
+const diffItemsOf = (record: RecordDetailDto) =>
+  record.items.filter(
+    (item) => item.actualQty !== null && item.actualQty !== item.expectedQty
+  );
+
+const describeDiffItem = (item: RecordDetailDto["items"][number]): string => {
+  const actualQty = item.actualQty ?? item.expectedQty;
+
+  return `${item.itemName}：应有 ${item.expectedQty} ${item.unit}，实盘 ${actualQty} ${item.unit}${item.note === null ? "" : `（${item.note}）`}`;
+};
+
+const buildDiffDescription = (record: RecordDetailDto): string => {
+  const items = diffItemsOf(record);
+
+  if (items.length === 0) {
+    return "";
+  }
+
+  return `接班核对发现数量差异：${items.map(describeDiffItem).join("；")}`;
+};
 
 const actualLine = (item: RecordDetailDto["items"][number]): string => {
   if (item.actualQty === null) {
@@ -71,12 +123,195 @@ const handoverActualLine = (item: RecordDetailDto["items"][number]): string =>
     ? `同应有 ${item.expectedQty} ${item.unit}`
     : `${item.handoverActualQty} ${item.unit}`;
 
-interface AcceptPanelProps {
+interface ExceptionReportFormProps {
   record: RecordDetailDto;
   onDone: () => void;
 }
 
-const AcceptPanel = ({ onDone, record }: AcceptPanelProps) => {
+const ExceptionReportForm = ({ onDone, record }: ExceptionReportFormProps) => {
+  const diffItems = diffItemsOf(record);
+
+  const [itemId, setItemId] = useState<string>(
+    diffItems.length === 1 ? (diffItems[0]?.itemId ?? "all") : "all"
+  );
+
+  const [type, setType] = useState<ExceptionTypeValue>("count_mismatch");
+  const [severity, setSeverity] = useState<SeverityValue>("medium");
+
+  const [description, setDescription] = useState(() =>
+    buildDiffDescription(record)
+  );
+
+  const createMutation = useMutation({
+    ...api.exceptions.create.mutationOptions(),
+    onSuccess: () => {
+      toast.success("异常上报已提交");
+      onDone();
+    },
+  });
+
+  const errorMessage =
+    createMutation.error === null ? null : createMutation.error.message;
+
+  return (
+    <div className="grid gap-3">
+      <Alert>
+        <ShieldAlertIcon />
+        <AlertTitle>发现 {diffItems.length} 项数量差异</AlertTitle>
+        <AlertDescription>
+          请先提交异常上报，之后才能登记用物消耗。
+        </AlertDescription>
+      </Alert>
+
+      <div className="grid gap-2">
+        <label className="text-sm font-medium" htmlFor="scan-exception-type">
+          异常类型
+        </label>
+        <Select
+          items={[...EXCEPTION_TYPE_OPTIONS]}
+          onValueChange={(value) => {
+            if (value === null) {
+              return;
+            }
+
+            setType(toExceptionType(value));
+          }}
+          value={type}
+        >
+          <SelectTrigger className="w-full" id="scan-exception-type">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {EXCEPTION_TYPE_OPTIONS.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="grid gap-2">
+        <label
+          className="text-sm font-medium"
+          htmlFor="scan-exception-severity"
+        >
+          严重程度
+        </label>
+        <Select
+          items={[...SEVERITY_OPTIONS]}
+          onValueChange={(value) => {
+            if (value === null) {
+              return;
+            }
+
+            setSeverity(toSeverity(value));
+          }}
+          value={severity}
+        >
+          <SelectTrigger className="w-full" id="scan-exception-severity">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {SEVERITY_OPTIONS.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {diffItems.length > 1 ? (
+        <div className="grid gap-2">
+          <label className="text-sm font-medium" htmlFor="scan-exception-item">
+            涉及物品
+          </label>
+          <Select
+            items={[
+              { label: "全部差异（合并上报）", value: "all" },
+              ...diffItems.map((item) => ({
+                label: item.itemName,
+                value: item.itemId,
+              })),
+            ]}
+            onValueChange={(value) => {
+              if (value === null) {
+                return;
+              }
+
+              setItemId(value);
+            }}
+            value={itemId}
+          >
+            <SelectTrigger className="w-full" id="scan-exception-item">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">全部差异（合并上报）</SelectItem>
+              {diffItems.map((item) => (
+                <SelectItem key={item.itemId} value={item.itemId}>
+                  {item.itemName}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      ) : null}
+
+      <div className="grid gap-2">
+        <label className="text-sm font-medium" htmlFor="scan-exception-desc">
+          异常描述
+        </label>
+        <Textarea
+          id="scan-exception-desc"
+          maxLength={500}
+          onChange={(event) => {
+            setDescription(event.target.value);
+          }}
+          placeholder="请描述发现的差异与现场情况"
+          value={description}
+        />
+      </div>
+
+      {errorMessage === null ? null : (
+        <p className="text-destructive text-sm" role="alert">
+          {errorMessage}
+        </p>
+      )}
+
+      <Button
+        className="w-full"
+        disabled={createMutation.isPending || description.trim().length === 0}
+        onClick={() => {
+          if (description.trim().length === 0) {
+            return;
+          }
+
+          createMutation.mutate({
+            description: description.trim(),
+            itemId: itemId === "all" ? undefined : itemId,
+            matterId: record.matterId,
+            recordId: record.id,
+            severity,
+            type,
+          });
+        }}
+        type="button"
+      >
+        {createMutation.isPending ? "提交中…" : "提交异常上报"}
+      </Button>
+    </div>
+  );
+};
+
+interface AcceptPanelProps {
+  record: RecordDetailDto;
+  onDone: () => void;
+  onAccepted: () => void;
+}
+
+const AcceptPanel = ({ onAccepted, onDone, record }: AcceptPanelProps) => {
   const [lines, setLines] = useState<ChecklistLine[]>(() =>
     buildChecklistLines(record.items)
   );
@@ -89,6 +324,7 @@ const AcceptPanel = ({ onDone, record }: AcceptPanelProps) => {
     onSuccess: () => {
       toast.success("已完成接班核对");
       onDone();
+      onAccepted();
     },
   });
 
@@ -104,6 +340,15 @@ const AcceptPanel = ({ onDone, record }: AcceptPanelProps) => {
               : `${record.acceptedByName} 已确认接收，清单已锁定。`}
           </AlertDescription>
         </Alert>
+        {record.permissions.requiresExceptionReport ? (
+          <Alert>
+            <ShieldAlertIcon />
+            <AlertTitle>存在数量差异，尚未异常上报</AlertTitle>
+            <AlertDescription>
+              请切换到「用物登记」页提交异常上报；上报后才能登记用物消耗。
+            </AlertDescription>
+          </Alert>
+        ) : null}
         <ul className="grid gap-2">
           {record.items.map((item) => (
             <li className="rounded-lg border p-3 text-sm" key={item.itemId}>
@@ -243,6 +488,15 @@ const HandoverPanel = ({ onDone, onGoAccept, record }: HandoverPanelProps) => {
 
   return (
     <div className="grid gap-3">
+      {record.permissions.requiresExceptionReport ? (
+        <Alert>
+          <ShieldAlertIcon />
+          <AlertTitle>存在数量差异，尚未异常上报</AlertTitle>
+          <AlertDescription>
+            交班表仍可提交，但建议先用物登记页完成异常上报，便于管理员跟进。
+          </AlertDescription>
+        </Alert>
+      ) : null}
       <p className="text-muted-foreground text-xs">
         交班前请再次核对清单；实盘与应有数量不一致时必须填写备注。
       </p>
@@ -301,9 +555,17 @@ interface UsagePanelProps {
   data: MatterByTokenDto;
   operatorName: string;
   onDone: () => void;
+  onGoAccept: () => void;
+  record: RecordDetailDto;
 }
 
-const UsagePanel = ({ data, onDone, operatorName }: UsagePanelProps) => {
+const UsagePanel = ({
+  data,
+  onDone,
+  onGoAccept,
+  operatorName,
+  record,
+}: UsagePanelProps) => {
   const createMutation = useMutation({
     ...api.usage.create.mutationOptions(),
     onSuccess: () => {
@@ -311,6 +573,40 @@ const UsagePanel = ({ data, onDone, operatorName }: UsagePanelProps) => {
       onDone();
     },
   });
+
+  if (record.status === "pending_acceptance") {
+    return (
+      <div className="grid gap-3">
+        <Alert>
+          <ClipboardCheckIcon />
+          <AlertTitle>请先完成接班核对</AlertTitle>
+          <AlertDescription>
+            接班确认接收后才能登记用物消耗；如数量有异常，还需先提交异常上报。
+          </AlertDescription>
+        </Alert>
+        <Button onClick={onGoAccept} type="button" variant="outline">
+          <ClipboardCheckIcon />
+          去做接班核对
+        </Button>
+      </div>
+    );
+  }
+
+  if (record.permissions.requiresExceptionReport) {
+    return <ExceptionReportForm onDone={onDone} record={record} />;
+  }
+
+  if (!record.permissions.canRegisterUsage) {
+    return (
+      <Alert>
+        <ShieldAlertIcon />
+        <AlertTitle>当前不能登记用物</AlertTitle>
+        <AlertDescription>
+          请先完成接班核对并处理数量差异，如有疑问请联系管理员。
+        </AlertDescription>
+      </Alert>
+    );
+  }
 
   if (data.items.length === 0) {
     return (
@@ -348,6 +644,11 @@ const ScanPage = () => {
     void queryClient.invalidateQueries({
       queryKey: api.matters.byToken.queryKey({ input: { token } }),
     });
+  };
+
+  const goUsageAfterAccept = () => {
+    setTab(TAB_USAGE);
+    void scanQuery.refetch();
   };
 
   if (scanQuery.isPending) {
@@ -418,7 +719,11 @@ const ScanPage = () => {
           </TabsList>
           <TabsContent value={TAB_ACCEPT}>
             <div className="pt-4">
-              <AcceptPanel onDone={refresh} record={today} />
+              <AcceptPanel
+                onAccepted={goUsageAfterAccept}
+                onDone={refresh}
+                record={today}
+              />
             </div>
           </TabsContent>
           <TabsContent value={TAB_USAGE}>
@@ -426,7 +731,11 @@ const ScanPage = () => {
               <UsagePanel
                 data={data}
                 onDone={refresh}
+                onGoAccept={() => {
+                  setTab(TAB_ACCEPT);
+                }}
                 operatorName={operatorName}
+                record={today}
               />
             </div>
           </TabsContent>

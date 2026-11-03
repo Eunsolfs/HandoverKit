@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { createClient, createTestUser, db } from "../support/api.ts";
+import {
+  createClient,
+  createTestUser,
+  db,
+  ensureAcceptedRecord,
+} from "../support/api.ts";
 import {
   captureOrpcError,
   createItemFixture,
@@ -53,6 +58,14 @@ const seedWeek = async () => {
     patientType: "outpatient" as const,
   };
 
+  await Promise.all(
+    ["2026-05-04", "2026-05-05", "2026-05-06", "2026-05-07", "2026-05-10"].map(
+      async (date) => {
+        await ensureAcceptedRecord(member.client, matter.id, date);
+      }
+    )
+  );
+
   await member.client.usage.create({
     ...patient,
     items: [{ itemId: gauze.id, quantity: 3 }],
@@ -97,29 +110,6 @@ const seedWeek = async () => {
   await member.client.usage.requestRevoke({
     id: pendingUsage.id,
     reason: "待审批统计用例",
-  });
-
-  await Promise.all(
-    ["2026-05-04", "2026-05-05"].map(async (date) => {
-      const record = await member.client.records.today({
-        date,
-        matterId: matter.id,
-      });
-
-      await member.client.records.accept({
-        id: record.id,
-        items: record.items.map((item) => ({
-          actualQty: item.expectedQty,
-          checked: true,
-          itemId: item.itemId,
-        })),
-      });
-    })
-  );
-
-  await member.client.records.today({
-    date: "2026-05-06",
-    matterId: matter.id,
   });
 
   await member.client.exceptions.create({
@@ -200,10 +190,10 @@ describe("stats", () => {
       start: "2026-05-04",
     });
     expect(overview.totals).toStrictEqual({
-      acceptedCount: 2,
+      acceptedCount: 5,
       itemKinds: 3,
       quantity: 9,
-      recordCount: 3,
+      recordCount: 5,
       usageCount: 4,
     });
     expect(
@@ -266,6 +256,9 @@ describe("stats", () => {
       patientNo: "S002",
       patientType: "outpatient" as const,
     };
+
+    await ensureAcceptedRecord(member.client, matter.id, "2026-05-06");
+    await ensureAcceptedRecord(member.client, matter.id, "2026-05-07");
 
     await member.client.usage.create({
       ...patient,

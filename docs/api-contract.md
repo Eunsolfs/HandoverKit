@@ -133,7 +133,15 @@ interface RecordDetailDto extends RecordSummaryDto {
   usages: UsageDto[];
   exceptions: ExceptionDto[];
   revokeRequests: RevokeRequestDto[];
-  permissions: { canAccept: boolean; canHandover: boolean; canDelete: boolean };
+  permissions: {
+    canAccept: boolean;
+    canHandover: boolean;
+    canDelete: boolean;
+    /** 验收存在数量差异且尚未提交异常上报 */
+    requiresExceptionReport: boolean;
+    /** 已接班且无未上报差异，允许登记用物 */
+    canRegisterUsage: boolean;
+  };
 }
 
 interface UsageItemDto {
@@ -299,18 +307,20 @@ interface StatsOverviewDto {
 | `records.submitHandover` | `{ id, items: { itemId, checked, actualQty?, note? }[], note? }`                                          | `RecordDetailDto`                                      | 登录；状态必须 accepted           |
 | `records.remove`         | `{ id }`                                                                                                  | `{ ok: true }`                                         | 管理员；仅当无消耗记录            |
 
-验收规则：清单中每一项都必须出现在入参且 `checked=true`；实盘数与应有数不一致时必须填写该行 note（自动生成 count_mismatch 异常事件）。
+验收规则：清单中每一项都必须出现在入参且 `checked=true`；实盘数与应有数不一致时必须填写该行 note。差异只写入清单，不自动创建异常；用户需通过 `exceptions.create` 提交异常上报后，`usage.create` 才会放行。
 
 ### 4.7 usage（用物消耗）
 
-| Procedure              | 入参                                                                                                                            | 返回                                  | 权限                                                                          |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- | ----------------------------------------------------------------------------- |
-| `usage.list`           | `{ matterId?, teamId?, from?, to?, status?, page?, pageSize? }`                                                                 | 分页 `UsageDto[]`                     | 登录（团队隔离）                                                              |
-| `usage.get`            | `{ id }`                                                                                                                        | `UsageDto`                            | 登录                                                                          |
-| `usage.create`         | `{ matterId, usedAt, patientName, patientType, patientNo, patientPhone?, operatorName?, note?, items: { itemId, quantity }[] }` | `UsageDto`                            | 登录；事务扣库存                                                              |
-| `usage.requestRevoke`  | `{ id, reason }`                                                                                                                | `RevokeRequestDto`                    | 记录所属团队成员                                                              |
-| `usage.pendingRevokes` | `{ teamId? }`                                                                                                                   | `RevokeRequestDto[]`（含 usage 摘要） | 管理员                                                                        |
-| `usage.reviewRevoke`   | `{ requestId, approve, note? }`                                                                                                 | `UsageDto`                            | 管理员；通过则恢复库存并置 revoked；驳回则 usage 恢复 active、申请置 rejected |
+> 流程门禁：`usage.create` 要求 `usedAt` 当日存在交接记录且状态为 accepted / handover_submitted；若验收存在数量差异（`actualQty != expectedQty`）且该记录没有任何异常事件，返回 `CONFLICT`，提示先提交异常上报。
+
+| Procedure              | 入参                                                                                                                            | 返回                                  | 权限                                                                                |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- | ----------------------------------------------------------------------------------- |
+| `usage.list`           | `{ matterId?, teamId?, from?, to?, status?, page?, pageSize? }`                                                                 | 分页 `UsageDto[]`                     | 登录（团队隔离）                                                                    |
+| `usage.get`            | `{ id }`                                                                                                                        | `UsageDto`                            | 登录                                                                                |
+| `usage.create`         | `{ matterId, usedAt, patientName, patientType, patientNo, patientPhone?, operatorName?, note?, items: { itemId, quantity }[] }` | `UsageDto`                            | 登录；事务扣库存。前置：该日期记录已确认接收；若验收有差异且无异常上报则 `CONFLICT` |
+| `usage.requestRevoke`  | `{ id, reason }`                                                                                                                | `RevokeRequestDto`                    | 记录所属团队成员                                                                    |
+| `usage.pendingRevokes` | `{ teamId? }`                                                                                                                   | `RevokeRequestDto[]`（含 usage 摘要） | 管理员                                                                              |
+| `usage.reviewRevoke`   | `{ requestId, approve, note? }`                                                                                                 | `UsageDto`                            | 管理员；通过则恢复库存并置 revoked；驳回则 usage 恢复 active、申请置 rejected       |
 
 ### 4.8 exceptions
 

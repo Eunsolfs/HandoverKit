@@ -1,12 +1,14 @@
 import { randomUUID } from "node:crypto";
 
 import { ORPCError } from "@orpc/server";
-import { and, count, desc, eq, gte, lte, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, lte, ne, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import type { Database } from "@handoverkit/db";
 import {
+  exceptionEvent,
   handoverRecord,
+  handoverRecordItem,
   item,
   matter,
   revokeRequest,
@@ -153,7 +155,7 @@ export const usageRouter = {
         }
 
         const [record] = tx
-          .select({ id: handoverRecord.id })
+          .select({ id: handoverRecord.id, status: handoverRecord.status })
           .from(handoverRecord)
           .where(
             and(
@@ -162,6 +164,39 @@ export const usageRouter = {
             )
           )
           .all();
+
+        if (record === undefined) {
+          throw usageConflict("该日期还没有交接记录，请先在扫码页完成接班核对");
+        }
+
+        if (record.status === "pending_acceptance") {
+          throw usageConflict("请先完成接班核对并确认接收，再登记用物");
+        }
+
+        const diffItems = tx
+          .select({ id: handoverRecordItem.id })
+          .from(handoverRecordItem)
+          .where(
+            and(
+              eq(handoverRecordItem.recordId, record.id),
+              ne(handoverRecordItem.actualQty, handoverRecordItem.expectedQty)
+            )
+          )
+          .all();
+
+        if (diffItems.length > 0) {
+          const [reported] = tx
+            .select({ id: exceptionEvent.id })
+            .from(exceptionEvent)
+            .where(eq(exceptionEvent.recordId, record.id))
+            .all();
+
+          if (reported === undefined) {
+            throw usageConflict(
+              `接班核对发现 ${diffItems.length} 项数量差异，请先提交异常上报后再登记用物`
+            );
+          }
+        }
 
         tx.insert(usageRecord)
           .values({
@@ -174,7 +209,7 @@ export const usageRouter = {
             patientNo: input.patientNo,
             patientPhone: input.patientPhone ?? null,
             patientType: input.patientType,
-            recordId: record?.id ?? null,
+            recordId: record.id,
             usedAt: input.usedAt,
           })
           .run();

@@ -1,5 +1,13 @@
 # 更新日志
 
+## v0.1.3（2026-11-03）交接流程状态门禁
+
+- 接班确认前：扫码页用物登记、交班表显示引导提示，后端同时拒绝 `usage.create` 与未接收状态的 `submitHandover`。
+- 数量差异：接班验收不再自动创建异常事件；差异会标记 `requiresExceptionReport`，用户需在扫码页提交异常上报（`exceptions.create`）后，`usage.create` 才放行。
+- 新增权限字段 `permissions.requiresExceptionReport` / `canRegisterUsage`，前端扫码页据此展示异常上报表单或登记表单。
+- 用物登记弹窗展示服务端错误（未接班/差异未上报/库存不足）；记录详情提示差异待上报。
+- 集成测试 58 个（新增门禁与异常上报用例）；E2E 4 条（新增「接班前禁止登记 + 差异先上报」场景）。
+
 ## v0.1.2（2026-11-03）发布自动化与一键运维
 
 - GitHub Actions：push tag 自动执行质量门禁（check/knip/57 集成测试）→ 构建 Docker 镜像推送 GHCR（多阶段、非 root、OCI labels、SBOM/provenance）→ 创建 GitHub Release。

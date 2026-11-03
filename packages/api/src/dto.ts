@@ -166,6 +166,10 @@ interface RecordPermissions {
   canAccept: boolean;
   canHandover: boolean;
   canDelete: boolean;
+  /** 接班核对存在数量差异且尚未提交异常上报。 */
+  requiresExceptionReport: boolean;
+  /** 当前是否允许登记用物（已接班且无未上报差异）。 */
+  canRegisterUsage: boolean;
 }
 
 export interface RecordDetailDto extends RecordSummaryDto {

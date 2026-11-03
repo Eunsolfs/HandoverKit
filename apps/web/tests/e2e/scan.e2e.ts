@@ -118,3 +118,86 @@ test("扫码页完成接班核对、用物登记与交班表全链路", async ({
   const glovesAfter = items.find((item) => item.id === gloves.id);
   expect(glovesAfter?.stock).toBe(48);
 });
+
+test("接班确认前禁止登记用物；数量差异必须先异常上报", async ({
+  context,
+  page,
+}) => {
+  const tag = uniqueSuffix();
+  const { client, cookie } = await login();
+
+  const team = await client.teams.create({
+    code: `E2E${tag}`,
+    name: `E2E 差异科室 ${tag}`,
+  });
+
+  const matter = await client.matters.create({
+    name: `E2E 差异事项 ${tag}`,
+    teamId: team.id,
+  });
+
+  await client.items.create({
+    matterId: matter.id,
+    minStock: 5,
+    name: "一次性无菌手套",
+    spec: "M 号",
+    stock: 50,
+    unit: "副",
+  });
+
+  await client.items.create({
+    matterId: matter.id,
+    minStock: 5,
+    name: "碘伏消毒液",
+    spec: "100ml",
+    stock: 20,
+    unit: "瓶",
+  });
+
+  await addSessionCookie(context, cookie);
+  await page.goto(`/scan/${matter.qrToken}`, {
+    waitUntil: "networkidle",
+  });
+
+  // 未接班：用物登记页只显示提示，不出现登记表单
+  await page.getByRole("tab", { name: "用物登记" }).click();
+  await expect(page.getByText("请先完成接班核对")).toBeVisible();
+  await expect(page.getByRole("button", { name: "提交用物登记" })).toHaveCount(
+    0
+  );
+
+  // 接班核对：制造一项数量差异并填写备注
+  await page.getByRole("tab", { name: "接班核对" }).click();
+  await checkItem(page, "一次性无菌手套");
+  await checkItem(page, "碘伏消毒液");
+  await page
+    .getByRole("spinbutton", { name: "一次性无菌手套 实盘数量" })
+    .fill("48");
+  await page
+    .getByRole("textbox", { name: "一次性无菌手套 差异备注" })
+    .fill("少 2 副");
+  await page.getByRole("button", { name: "确认接收" }).click();
+
+  // 自动跳到用物登记：差异未上报前只能看到异常上报表单
+  await expect(page.getByText("发现 1 项数量差异")).toBeVisible();
+  await expect(page.getByRole("button", { name: "提交用物登记" })).toHaveCount(
+    0
+  );
+  await expect(
+    page.getByRole("button", { name: "提交异常上报" })
+  ).toBeVisible();
+
+  // 提交异常上报后解锁用物登记
+  await page.getByRole("button", { name: "提交异常上报" }).click();
+  await expect(page.getByText("异常上报已提交", { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "提交用物登记" })
+  ).toBeVisible();
+
+  const detail = await client.records.today({ matterId: matter.id });
+  expect(detail.permissions.requiresExceptionReport).toBe(false);
+  expect(detail.permissions.canRegisterUsage).toBe(true);
+  expect(detail.exceptions).toHaveLength(1);
+  expect(detail.exceptions[0]?.type).toBe("count_mismatch");
+  expect(detail.diffCount).toBe(1);
+});

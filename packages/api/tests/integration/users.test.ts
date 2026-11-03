@@ -2,7 +2,13 @@ import { describe, expect, it } from "vite-plus/test";
 
 import { verifyCredentialPassword } from "@handoverkit/auth";
 
-import { auth, createClient, createTestUser, db } from "../support/api.ts";
+import {
+  auth,
+  createClient,
+  createTestUser,
+  db,
+  ensureAcceptedRecord,
+} from "../support/api.ts";
 import {
   captureOrpcError,
   createItemFixture,
@@ -284,6 +290,8 @@ describe("users", () => {
     const member = await createTestUser({ role: "member", teamId: team.id });
     const matter = createMatterFixture(db, team.id);
     const item = createItemFixture(db, matter.id, { stock: 5 });
+
+    await ensureAcceptedRecord(member.client, matter.id, "2026-01-05");
 
     await member.client.usage.create({
       items: [{ itemId: item.id, quantity: 1 }],

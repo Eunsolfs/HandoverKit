@@ -10,6 +10,11 @@ import {
 import { useState } from "react";
 import { toast } from "sonner";
 
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "@handoverkit/ui/components/alert";
 import { Button } from "@handoverkit/ui/components/button";
 import {
   Card,
@@ -183,6 +188,15 @@ const RecordDetailPage = () => {
           <ArrowLeftIcon className="size-3.5" />
           返回交接记录
         </AppLink>
+        {record.permissions.requiresExceptionReport ? (
+          <Alert>
+            <ShieldAlertIcon />
+            <AlertTitle>接班核对存在数量差异，尚未异常上报</AlertTitle>
+            <AlertDescription>
+              请到该事项的扫码页切换到「用物登记」提交异常上报；上报后才能登记用物消耗。
+            </AlertDescription>
+          </Alert>
+        ) : null}
         <PageHeader
           actions={
             <>
@@ -489,7 +503,7 @@ const RecordDetailPage = () => {
       {dialog === "accept" ? (
         <ChecklistDialog
           confirmLabel="确认接收"
-          description="请逐项核对；实盘与应有数量不一致时必须填写备注。"
+          description="请逐项核对；实盘与应有数量不一致时必须填写备注，并需在扫码页提交异常上报后才能登记用物。"
           items={record.items}
           onOpenChange={(open) => {
             if (!open) {
