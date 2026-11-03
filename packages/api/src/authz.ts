@@ -79,7 +79,17 @@ export interface MatterAccess {
   teamId: string;
   qrToken: string;
   qrVersion: number;
+  status: string;
 }
+
+/** 归档事项不允许继续扫码、生成记录或登记用物。 */
+export const assertMatterActive = (access: MatterAccess) => {
+  if (access.status !== "active") {
+    throw new ORPCError("CONFLICT", {
+      message: "该交接事项已归档，无法继续使用",
+    });
+  }
+};
 
 /** 取交接事项并校验团队隔离；越权统一 NOT_FOUND。 */
 export const assertMatterAccess = async (
@@ -92,6 +102,7 @@ export const assertMatterAccess = async (
       id: matter.id,
       qrToken: matter.qrToken,
       qrVersion: matter.qrVersion,
+      status: matter.status,
       teamId: matter.teamId,
     })
     .from(matter)

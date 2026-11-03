@@ -1,5 +1,3 @@
-# syntax=docker/dockerfile:1
-
 # ---- 构建阶段：Vite+ 镜像内含 Node 24 与 pnpm，产出无 node_modules 的自包含 bundle ----
 FROM ghcr.io/voidzero-dev/vite-plus:1.3.0 AS build
 WORKDIR /app

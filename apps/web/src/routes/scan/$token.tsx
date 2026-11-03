@@ -636,9 +636,11 @@ const ScanPage = () => {
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<ScanTab>(TAB_ACCEPT);
 
-  const scanQuery = useQuery(
-    api.matters.byToken.queryOptions({ input: { token } })
-  );
+  // 二维码无效/事项归档属于 4xx，不应重试，避免长时间骨架屏后才显示错误
+  const scanQuery = useQuery({
+    ...api.matters.byToken.queryOptions({ input: { token } }),
+    retry: false,
+  });
 
   const refresh = () => {
     void queryClient.invalidateQueries({

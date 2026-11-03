@@ -158,6 +158,12 @@ export const mattersRouter = {
         throw new ORPCError("NOT_FOUND", { message: "二维码无效或已失效" });
       }
 
+      if (row.status !== "active") {
+        throw new ORPCError("CONFLICT", {
+          message: "该交接事项已归档，无法继续使用",
+        });
+      }
+
       assertTeamAccess(context.user, row.teamId);
 
       const teamRow = loadTeamRow(context.db, row.teamId);

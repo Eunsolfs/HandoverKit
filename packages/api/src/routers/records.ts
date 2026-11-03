@@ -10,7 +10,11 @@ import {
   usageRecord,
 } from "@handoverkit/db/schema/handover";
 
-import { assertMatterAccess, resolveTeamId } from "#src/authz.ts";
+import {
+  assertMatterAccess,
+  assertMatterActive,
+  resolveTeamId,
+} from "#src/authz.ts";
 import type { Profile } from "#src/context.ts";
 import {
   calendarDateSchema,
@@ -159,6 +163,10 @@ export const recordsRouter = {
         context.db,
         context.user,
         input.id
+      );
+
+      assertMatterActive(
+        await assertMatterAccess(context.db, context.user, row.matterId)
       );
 
       if (row.status !== "pending_acceptance") {
@@ -363,6 +371,10 @@ export const recordsRouter = {
         input.id
       );
 
+      assertMatterActive(
+        await assertMatterAccess(context.db, context.user, row.matterId)
+      );
+
       if (row.status !== "accepted") {
         throw statusConflict("当前记录不是已接收状态，不能提交交班表");
       }
@@ -424,6 +436,8 @@ export const recordsRouter = {
         context.user,
         input.matterId
       );
+
+      assertMatterActive(access);
 
       const teamRow = loadTeamRow(context.db, access.teamId);
 

@@ -19,6 +19,7 @@ import {
 
 import {
   assertMatterAccess,
+  assertMatterActive,
   assertTeamAccess,
   resolveTeamId,
 } from "#src/authz.ts";
@@ -108,7 +109,13 @@ export const usageRouter = {
       })
     )
     .handler(async ({ context, input }) => {
-      await assertMatterAccess(context.db, context.user, input.matterId);
+      const matterAccess = await assertMatterAccess(
+        context.db,
+        context.user,
+        input.matterId
+      );
+
+      assertMatterActive(matterAccess);
 
       const seen = new Set<string>();
 

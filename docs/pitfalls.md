@@ -147,3 +147,9 @@
 
 - 现象：`ops.sh upgrade handoverkit:local` 被拼成 `ghcr.io/eunsolfs/handoverkit:handoverkit:local`（invalid reference）。
 - 处理：目标包含 `:` 或 `/` 时按完整镜像引用处理；否则按 tag 拼接当前镜像仓库。
+
+### 23. 本地无法访问 GHCR 时的镜像重建
+
+- 现象：本机 Docker Desktop 在某次网络切换后无法解析/连接 ghcr.io（`lookup ghcr.io: no such host` / 连接超时），而 GitHub、npm 正常；Dockerfile 的构建基础镜像在 ghcr.io，导致 `docker build` 失败。
+- 处理：本地验证可复用已有运行镜像，把宿主机 `vp run -r build` 产出的 `apps/server/dist` 与 `apps/web/dist` 复制进临时容器后 `docker commit` 成新 tag，再 `compose up -d --force-recreate app`（仅用于本地复测，不替代正式构建）。正式镜像由 GitHub Actions 构建，CI 网络可访问 GHCR。
+- 另：Dockerfile 顶部 `# syntax=docker/dockerfile:1` 会让 BuildKit 额外拉取 docker.io 前端镜像；本地网络受限时已移除该行（标准 Dockerfile 语法不需要它）。

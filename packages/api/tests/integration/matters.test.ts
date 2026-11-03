@@ -227,4 +227,75 @@ describe("matters", () => {
 
     expect(archivedList.map((row) => row.id)).toStrictEqual([matter.id]);
   });
+
+  it("归档后禁止扫码、生成记录与登记用物，但历史记录仍可读取", async () => {
+    const team = createTeamFixture(db);
+
+    const teamAdmin = await createTestUser({
+      role: "team_admin",
+      teamId: team.id,
+    });
+
+    const member = await createTestUser({ role: "member", teamId: team.id });
+
+    const matter = await teamAdmin.client.matters.create({
+      name: "待归档事项",
+    });
+
+    createItemFixture(db, matter.id, { stock: 10, unit: "包" });
+
+    const record = await member.client.records.today({
+      date: "2026-06-01",
+      matterId: matter.id,
+    });
+
+    await member.client.records.accept({
+      id: record.id,
+      items: record.items.map((item) => ({
+        actualQty: item.expectedQty,
+        checked: true,
+        itemId: item.itemId,
+        note: null,
+      })),
+    });
+
+    const usage = await member.client.usage.create({
+      items: [{ itemId: record.items[0]?.itemId ?? "", quantity: 1 }],
+      matterId: matter.id,
+      patientName: "归档前患者",
+      patientNo: "A001",
+      patientType: "outpatient",
+      usedAt: "2026-06-01",
+    });
+
+    await teamAdmin.client.matters.archive({ id: matter.id });
+
+    const scanBlocked = await captureOrpcError(
+      member.client.matters.byToken({ token: matter.qrToken })
+    );
+
+    const todayBlocked = await captureOrpcError(
+      member.client.records.today({ matterId: matter.id })
+    );
+
+    const usageBlocked = await captureOrpcError(
+      member.client.usage.create({
+        items: [{ itemId: record.items[0]?.itemId ?? "", quantity: 1 }],
+        matterId: matter.id,
+        patientName: "归档后患者",
+        patientNo: "A002",
+        patientType: "outpatient",
+        usedAt: "2026-06-01",
+      })
+    );
+
+    expect([
+      scanBlocked.code,
+      todayBlocked.code,
+      usageBlocked.code,
+    ]).toStrictEqual(["CONFLICT", "CONFLICT", "CONFLICT"]);
+
+    const detail = await member.client.records.get({ id: record.id });
+    expect(detail.usages.map((row) => row.id)).toContain(usage.id);
+  });
 });
