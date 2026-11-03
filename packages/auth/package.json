@@ -1,0 +1,22 @@
+{
+  "name": "@handoverkit/auth",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "imports": {
+    "#src/*": "./src/*"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@better-auth/drizzle-adapter": "catalog:",
+    "@handoverkit/db": "workspace:*",
+    "better-auth": "catalog:"
+  },
+  "devDependencies": {
+    "@handoverkit/config": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:"
+  }
+}

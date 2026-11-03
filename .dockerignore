@@ -1,0 +1,16 @@
+.git
+**/node_modules
+**/dist
+**/coverage
+**/.vitest
+**/*.tsbuildinfo
+**/*.local
+**/*.log
+**/.tanstack
+**/*.db
+**/*.db-shm
+**/*.db-wal
+**/playwright-report
+**/test-results
+**/.env
+**/.env.*

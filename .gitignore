@@ -1,0 +1,27 @@
+node_modules
+dist
+coverage
+.vitest
+*.tsbuildinfo
+*.local
+*.log
+.tanstack
+*.db
+*.db-shm
+*.db-wal
+playwright-report
+test-results
+
+.env
+.env.*
+
+.DS_Store
+.idea
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+
+# local toolchain / caches (not part of the app)
+.tools
+.npm-cache
+.pnpm-store

@@ -1,0 +1,4 @@
+{
+  "extends": "@handoverkit/config/typescript/node.json",
+  "include": ["src", "tests"]
+}

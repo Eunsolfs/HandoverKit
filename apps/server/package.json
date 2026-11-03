@@ -1,0 +1,33 @@
+{
+  "name": "@handoverkit/server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "imports": {
+    "#src/*": "./src/*"
+  },
+  "scripts": {
+    "dev": "node --watch --env-file-if-exists=.env src/index.ts",
+    "build": "vp pack",
+    "start": "node --env-file-if-exists=.env dist/index.mjs",
+    "db:migrate": "node --env-file-if-exists=.env src/migrate.ts"
+  },
+  "dependencies": {
+    "@handoverkit/api": "workspace:*",
+    "@handoverkit/auth": "workspace:*",
+    "@handoverkit/db": "workspace:*",
+    "@hono/node-server": "catalog:",
+    "@orpc/openapi": "catalog:",
+    "@orpc/server": "catalog:",
+    "@orpc/zod": "catalog:",
+    "@t3-oss/env-core": "catalog:",
+    "hono": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@handoverkit/config": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vite-plus": "catalog:"
+  }
+}

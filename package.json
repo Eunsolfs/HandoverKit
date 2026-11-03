@@ -1,0 +1,38 @@
+{
+  "name": "handoverkit",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vp run -r --parallel dev",
+    "build": "vp run -r build",
+    "ready": "vp check && vp run knip && vp test && vp run test:e2e && vp run -r build",
+    "prepare": "vp config",
+    "db:generate": "vp run --filter @handoverkit/db db:generate",
+    "db:migrate": "vp run --filter @handoverkit/server db:migrate",
+    "db:studio": "vp run --filter @handoverkit/db db:studio",
+    "test:e2e": "vp run --filter @handoverkit/web test:e2e",
+    "knip": "knip"
+  },
+  "devDependencies": {
+    "@handoverkit/config": "workspace:*",
+    "@shadcn/lint": "catalog:",
+    "@types/node": "catalog:",
+    "knip": "catalog:",
+    "typescript": "catalog:",
+    "ultracite": "catalog:",
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
+  },
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": ">=12.15.0",
+      "onFail": "warn"
+    }
+  },
+  "engines": {
+    "node": ">=24.11.0",
+    "pnpm": ">=12.15.0"
+  }
+}
