@@ -14,10 +14,17 @@ RUN vp install --frozen-lockfile --filter "@handoverkit/server..." --filter "@ha
 
 COPY --chown=vp:vp . .
 RUN vp run --filter "@handoverkit/server..." --filter "@handoverkit/web..." build
-RUN cp "$(vp env which node | head -1)" /tmp/node
 
-# ---- 运行阶段：仅 Node + 构建产物；SQLite 数据落在 /data 卷 ----
-FROM debian:trixie-slim AS runtime
+# ---- Node 运行时：Alpine Node 24，strip 后只保留二进制 ----
+# node:24-alpine 当前基于 Alpine 3.24；如升级其中一个，需同步验证另一个。
+FROM node:24-alpine AS node-runtime
+RUN apk add --no-cache binutils \
+  && cp /usr/local/bin/node /tmp/node \
+  && chmod u+w /tmp/node \
+  && strip --strip-all /tmp/node
+
+# ---- 运行阶段：极小 Alpine + 精简 Node + 构建产物；SQLite 数据落在 /data 卷 ----
+FROM alpine:3.24 AS runtime
 ARG APP_VERSION=dev
 LABEL org.opencontainers.image.title="易交接 HandoverKit" \
       org.opencontainers.image.description="医疗用物与交接记录系统（React + Hono + oRPC + SQLite）" \
@@ -28,21 +35,26 @@ LABEL org.opencontainers.image.title="易交接 HandoverKit" \
 WORKDIR /app
 
 ENV NODE_ENV=production \
+    PATH=/usr/local/bin:$PATH \
     PORT=3000 \
     DATABASE_URL=/data/app.db \
     TZ=Asia/Shanghai
 
-# Node 运行时自带完整 ICU；TZ 依赖 Debian 基础镜像自带的 tzdata（Priority: required）。
-COPY --from=build /tmp/node /usr/local/bin/node
+# Node 运行时自带完整 ICU；tzdata 提供 TZ 解析；libstdc++/libgcc 是 Node 动态依赖。
+RUN apk add --no-cache libstdc++ libgcc ca-certificates tzdata \
+  && addgroup -S app \
+  && adduser -S -G app app \
+  && mkdir -p /data \
+  && chown app:app /data
+
+COPY --from=node-runtime /tmp/node /usr/local/bin/node
 
 # dist/migrations 由 apps/server/vite.config.ts 的 pack.copy 从 packages/db 复制；
 # dist/index.mjs 提供 /rpc、/api、/api/auth 与 SPA，dist/migrate.mjs 只做迁移。
 COPY --from=build /app/apps/server/dist ./dist
 COPY --from=build /app/apps/web/dist ./dist/public
 
-RUN mkdir -p /data && chown nobody:nogroup /data
-
-USER nobody
+USER app
 VOLUME /data
 EXPOSE 3000
 
