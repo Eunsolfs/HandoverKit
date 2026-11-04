@@ -1,9 +1,15 @@
 import { randomUUID } from "node:crypto";
 
 import { ORPCError } from "@orpc/server";
+import { eq } from "drizzle-orm";
 
 import type { Database } from "@handoverkit/db";
-import { item, matter, team } from "@handoverkit/db/schema/handover";
+import {
+  item,
+  matter,
+  subWarehouse,
+  team,
+} from "@handoverkit/db/schema/handover";
 
 let sequence = 0;
 
@@ -81,6 +87,15 @@ export const createMatterFixture = (
     throw new Error("交接事项创建失败");
   }
 
+  db.insert(subWarehouse)
+    .values({
+      id: randomUUID(),
+      matterId: row.id,
+      name: "主仓库",
+      sortOrder: 0,
+    })
+    .run();
+
   return row;
 };
 
@@ -91,6 +106,19 @@ export const createItemFixture = (
 ) => {
   const index = nextSequence();
 
+  const [warehouse] = db
+    .select({ id: subWarehouse.id })
+    .from(subWarehouse)
+    .where(eq(subWarehouse.matterId, matterId))
+    .limit(1)
+    .all();
+
+  const subWarehouseId = overrides.subWarehouseId ?? warehouse?.id;
+
+  if (subWarehouseId === undefined) {
+    throw new Error("交接事项缺少子仓库");
+  }
+
   const [row] = db
     .insert(item)
     .values({
@@ -98,6 +126,7 @@ export const createItemFixture = (
       matterId,
       name: `物品${index}`,
       stock: 10,
+      subWarehouseId,
       unit: "个",
       ...overrides,
     })

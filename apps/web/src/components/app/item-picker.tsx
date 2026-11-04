@@ -10,6 +10,7 @@ export interface PickerItem {
   id: string;
   name: string;
   spec: string | null;
+  subWarehouseName?: string;
   unit: string;
   stock: number;
 }
@@ -26,8 +27,13 @@ interface ItemPickerProps {
   id?: string;
 }
 
-const itemLabel = (item: PickerItem): string =>
-  item.spec === null ? item.name : `${item.name} · ${item.spec}`;
+const itemLabel = (item: PickerItem): string => {
+  const base = item.spec === null ? item.name : `${item.name} · ${item.spec}`;
+
+  return item.subWarehouseName === undefined
+    ? base
+    : `${base} · ${item.subWarehouseName}`;
+};
 
 /** 用物只能从交接事项的仓库里选，禁止手工输入，避免脏数据。 */
 export const ItemPicker = ({

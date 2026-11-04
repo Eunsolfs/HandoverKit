@@ -445,4 +445,128 @@ describe("records", () => {
       "NOT_FOUND",
     ]);
   });
+
+  it("接班有差异必须先异常上报才能交班", async () => {
+    const { gauze, matter, member } = await setup();
+    const date = "2026-06-01";
+
+    const record = await member.client.records.today({
+      date,
+      matterId: matter.id,
+    });
+
+    const expected =
+      record.items.find((row) => row.itemId === gauze.id)?.expectedQty ?? 0;
+
+    const accepted = await member.client.records.accept({
+      id: record.id,
+      items: record.items.map((row) => ({
+        actualQty: row.itemId === gauze.id ? expected - 1 : row.expectedQty,
+        checked: true,
+        itemId: row.itemId,
+        note: row.itemId === gauze.id ? "少 1 包" : null,
+      })),
+    });
+
+    expect({
+      canHandover: accepted.permissions.canHandover,
+      requiresExceptionReport: accepted.permissions.requiresExceptionReport,
+    }).toStrictEqual({
+      canHandover: false,
+      requiresExceptionReport: true,
+    });
+
+    const blocked = await captureOrpcError(
+      member.client.records.submitHandover({
+        id: record.id,
+        items: record.items.map((row) => ({
+          actualQty: row.expectedQty,
+          checked: true,
+          itemId: row.itemId,
+        })),
+      })
+    );
+
+    expect({
+      code: blocked.code,
+      mentionsReport: blocked.message.includes("异常上报"),
+    }).toStrictEqual({ code: "CONFLICT", mentionsReport: true });
+
+    await member.client.exceptions.create({
+      matterId: matter.id,
+      recordId: record.id,
+      itemId: gauze.id,
+      type: "count_mismatch",
+      severity: "medium",
+      description: "接班纱布少 1 包",
+    });
+
+    const afterReport = await member.client.records.get({ id: record.id });
+    expect(afterReport.permissions.canHandover).toBeTruthy();
+
+    const submitted = await member.client.records.submitHandover({
+      id: record.id,
+      items: record.items.map((row) => ({
+        actualQty: row.expectedQty,
+        checked: true,
+        itemId: row.itemId,
+      })),
+    });
+
+    expect({
+      canRegisterUsage: submitted.permissions.canRegisterUsage,
+      status: submitted.status,
+    }).toStrictEqual({
+      canRegisterUsage: false,
+      status: "handover_submitted",
+    });
+  });
+
+  it("交班核对发现新差异也必须先异常上报", async () => {
+    const { gauze, matter, member } = await setup();
+    const date = "2026-06-05";
+
+    const record = await member.client.records.today({
+      date,
+      matterId: matter.id,
+    });
+
+    await member.client.records.accept({
+      id: record.id,
+      items: checkedItems(record),
+    });
+
+    const handoverItems = record.items.map((item) => ({
+      actualQty:
+        item.itemId === gauze.id ? item.expectedQty - 1 : item.expectedQty,
+      checked: true,
+      itemId: item.itemId,
+      note: item.itemId === gauze.id ? "交班少 1 包" : null,
+    }));
+
+    const blocked = await captureOrpcError(
+      member.client.records.submitHandover({
+        id: record.id,
+        items: handoverItems,
+      })
+    );
+
+    expect(blocked.code).toBe("CONFLICT");
+
+    await member.client.exceptions.create({
+      matterId: matter.id,
+      recordId: record.id,
+      itemId: gauze.id,
+      type: "count_mismatch",
+      severity: "medium",
+      description: "交班核对纱布少 1 包",
+    });
+
+    const submitted = await member.client.records.submitHandover({
+      id: record.id,
+      items: handoverItems,
+    });
+
+    expect(submitted.status).toBe("handover_submitted");
+  });
 });

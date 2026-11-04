@@ -1,7 +1,7 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "60e13c4e-1966-4eb8-8c6d-cd01f74edd23",
+  "id": "e717302a-7680-461f-85ab-681ccc4bf82b",
   "prevIds": [
     "00000000-0000-0000-0000-000000000000"
   ],
@@ -51,6 +51,14 @@
       "entityType": "tables"
     },
     {
+      "name": "stock_transfer",
+      "entityType": "tables"
+    },
+    {
+      "name": "sub_warehouse",
+      "entityType": "tables"
+    },
+    {
       "name": "team",
       "entityType": "tables"
     },
@@ -60,10 +68,6 @@
     },
     {
       "name": "usage_record",
-      "entityType": "tables"
-    },
-    {
-      "name": "todos",
       "entityType": "tables"
     },
     {
@@ -648,6 +652,16 @@
     },
     {
       "table": "handover_record",
+      "name": "sub_warehouse_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "handover_record",
       "name": "record_date",
       "type": "text",
       "notNull": true,
@@ -919,6 +933,16 @@
     {
       "table": "item",
       "name": "matter_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "item",
+      "name": "sub_warehouse_id",
       "type": "text",
       "notNull": true,
       "autoincrement": false,
@@ -1288,6 +1312,16 @@
     },
     {
       "table": "stock_movement",
+      "name": "sub_warehouse_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "stock_movement",
       "name": "item_id",
       "type": "text",
       "notNull": true,
@@ -1379,6 +1413,246 @@
     {
       "table": "stock_movement",
       "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "(cast(unixepoch('subsec') * 1000 as integer))",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "stock_transfer",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "stock_transfer",
+      "name": "matter_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "stock_transfer",
+      "name": "from_sub_warehouse_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "stock_transfer",
+      "name": "to_sub_warehouse_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "stock_transfer",
+      "name": "source_item_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "stock_transfer",
+      "name": "target_item_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "stock_transfer",
+      "name": "item_name",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "stock_transfer",
+      "name": "item_spec",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "stock_transfer",
+      "name": "unit",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "stock_transfer",
+      "name": "quantity",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "stock_transfer",
+      "name": "operator_user_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "stock_transfer",
+      "name": "operator_name",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "stock_transfer",
+      "name": "note",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "stock_transfer",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "(cast(unixepoch('subsec') * 1000 as integer))",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "sub_warehouse",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "sub_warehouse",
+      "name": "matter_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "sub_warehouse",
+      "name": "name",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "sub_warehouse",
+      "name": "code",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "sub_warehouse",
+      "name": "location",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "sub_warehouse",
+      "name": "description",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "sub_warehouse",
+      "name": "status",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'active'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "sub_warehouse",
+      "name": "sort_order",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "sub_warehouse",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "(cast(unixepoch('subsec') * 1000 as integer))",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "sub_warehouse",
+      "name": "updated_at",
       "type": "integer",
       "notNull": true,
       "autoincrement": false,
@@ -1558,6 +1832,16 @@
     },
     {
       "table": "usage_record",
+      "name": "sub_warehouse_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "usage_record",
       "name": "record_id",
       "type": "text",
       "notNull": false,
@@ -1571,6 +1855,36 @@
       "name": "used_at",
       "type": "text",
       "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "usage_record",
+      "name": "used_at_time",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "usage_record",
+      "name": "is_backfill",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "false",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "usage_record",
+      "name": "backfill_reason",
+      "type": "text",
+      "notNull": false,
       "autoincrement": false,
       "default": null,
       "generated": null,
@@ -1687,56 +2001,6 @@
       "entityType": "columns"
     },
     {
-      "table": "todos",
-      "name": "completed",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "false",
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "todos",
-      "name": "created_at",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "(cast(unixepoch('subsec') * 1000 as integer))",
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "todos",
-      "name": "id",
-      "type": "integer",
-      "notNull": false,
-      "autoincrement": true,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "todos",
-      "name": "title",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "todos",
-      "name": "user_id",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
       "table": "account",
       "name": "account_user_id_idx",
       "columns": [
@@ -1840,10 +2104,10 @@
     },
     {
       "table": "handover_record",
-      "name": "handover_record_matter_date_unique",
+      "name": "handover_record_sub_warehouse_date_unique",
       "columns": [
         {
-          "value": "matter_id",
+          "value": "sub_warehouse_id",
           "isExpression": false
         },
         {
@@ -1862,6 +2126,24 @@
       "columns": [
         {
           "value": "matter_id",
+          "isExpression": false
+        },
+        {
+          "value": "created_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "handover_record",
+      "name": "handover_record_sub_warehouse_created_idx",
+      "columns": [
+        {
+          "value": "sub_warehouse_id",
           "isExpression": false
         },
         {
@@ -1922,10 +2204,10 @@
     },
     {
       "table": "item",
-      "name": "item_matter_name_unique",
+      "name": "item_sub_warehouse_name_unique",
       "columns": [
         {
-          "value": "matter_id",
+          "value": "sub_warehouse_id",
           "isExpression": false
         },
         {
@@ -1944,6 +2226,24 @@
       "columns": [
         {
           "value": "matter_id",
+          "isExpression": false
+        },
+        {
+          "value": "status",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "item",
+      "name": "item_sub_warehouse_status_idx",
+      "columns": [
+        {
+          "value": "sub_warehouse_id",
           "isExpression": false
         },
         {
@@ -2071,6 +2371,114 @@
       "entityType": "indexes"
     },
     {
+      "table": "stock_movement",
+      "name": "stock_movement_sub_warehouse_created_idx",
+      "columns": [
+        {
+          "value": "sub_warehouse_id",
+          "isExpression": false
+        },
+        {
+          "value": "created_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "stock_transfer",
+      "name": "stock_transfer_matter_created_idx",
+      "columns": [
+        {
+          "value": "matter_id",
+          "isExpression": false
+        },
+        {
+          "value": "created_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "stock_transfer",
+      "name": "stock_transfer_from_created_idx",
+      "columns": [
+        {
+          "value": "from_sub_warehouse_id",
+          "isExpression": false
+        },
+        {
+          "value": "created_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "stock_transfer",
+      "name": "stock_transfer_to_created_idx",
+      "columns": [
+        {
+          "value": "to_sub_warehouse_id",
+          "isExpression": false
+        },
+        {
+          "value": "created_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "sub_warehouse",
+      "name": "sub_warehouse_matter_name_unique",
+      "columns": [
+        {
+          "value": "matter_id",
+          "isExpression": false
+        },
+        {
+          "value": "name",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "sub_warehouse",
+      "name": "sub_warehouse_matter_status_idx",
+      "columns": [
+        {
+          "value": "matter_id",
+          "isExpression": false
+        },
+        {
+          "value": "status",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
       "table": "team",
       "name": "team_name_unique",
       "columns": [
@@ -2146,6 +2554,24 @@
     },
     {
       "table": "usage_record",
+      "name": "usage_record_sub_warehouse_used_at_idx",
+      "columns": [
+        {
+          "value": "sub_warehouse_id",
+          "isExpression": false
+        },
+        {
+          "value": "used_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "usage_record",
       "name": "usage_record_record_idx",
       "columns": [
         {
@@ -2164,20 +2590,6 @@
       "columns": [
         {
           "value": "status",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "todos",
-      "name": "todos_user_id_idx",
-      "columns": [
-        {
-          "value": "user_id",
           "isExpression": false
         }
       ],
@@ -2277,6 +2689,21 @@
       "entityType": "fks"
     },
     {
+      "table": "handover_record",
+      "name": "fk_handover_record_sub_warehouse_id_sub_warehouse_id_fk",
+      "columns": [
+        "sub_warehouse_id"
+      ],
+      "tableTo": "sub_warehouse",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
       "table": "handover_record_item",
       "name": "fk_handover_record_item_record_id_handover_record_id_fk",
       "columns": [
@@ -2313,6 +2740,21 @@
         "matter_id"
       ],
       "tableTo": "matter",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "item",
+      "name": "fk_item_sub_warehouse_id_sub_warehouse_id_fk",
+      "columns": [
+        "sub_warehouse_id"
+      ],
+      "tableTo": "sub_warehouse",
       "columnsTo": [
         "id"
       ],
@@ -2368,11 +2810,116 @@
     },
     {
       "table": "stock_movement",
+      "name": "fk_stock_movement_sub_warehouse_id_sub_warehouse_id_fk",
+      "columns": [
+        "sub_warehouse_id"
+      ],
+      "tableTo": "sub_warehouse",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "stock_movement",
       "name": "fk_stock_movement_item_id_item_id_fk",
       "columns": [
         "item_id"
       ],
       "tableTo": "item",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "stock_transfer",
+      "name": "fk_stock_transfer_matter_id_matter_id_fk",
+      "columns": [
+        "matter_id"
+      ],
+      "tableTo": "matter",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "stock_transfer",
+      "name": "fk_stock_transfer_from_sub_warehouse_id_sub_warehouse_id_fk",
+      "columns": [
+        "from_sub_warehouse_id"
+      ],
+      "tableTo": "sub_warehouse",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "RESTRICT",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "stock_transfer",
+      "name": "fk_stock_transfer_to_sub_warehouse_id_sub_warehouse_id_fk",
+      "columns": [
+        "to_sub_warehouse_id"
+      ],
+      "tableTo": "sub_warehouse",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "RESTRICT",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "stock_transfer",
+      "name": "fk_stock_transfer_source_item_id_item_id_fk",
+      "columns": [
+        "source_item_id"
+      ],
+      "tableTo": "item",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "RESTRICT",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "stock_transfer",
+      "name": "fk_stock_transfer_target_item_id_item_id_fk",
+      "columns": [
+        "target_item_id"
+      ],
+      "tableTo": "item",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "RESTRICT",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "sub_warehouse",
+      "name": "fk_sub_warehouse_matter_id_matter_id_fk",
+      "columns": [
+        "matter_id"
+      ],
+      "tableTo": "matter",
       "columnsTo": [
         "id"
       ],
@@ -2428,6 +2975,21 @@
     },
     {
       "table": "usage_record",
+      "name": "fk_usage_record_sub_warehouse_id_sub_warehouse_id_fk",
+      "columns": [
+        "sub_warehouse_id"
+      ],
+      "tableTo": "sub_warehouse",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "RESTRICT",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "usage_record",
       "name": "fk_usage_record_record_id_handover_record_id_fk",
       "columns": [
         "record_id"
@@ -2438,21 +3000,6 @@
       ],
       "onUpdate": "NO ACTION",
       "onDelete": "SET NULL",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "todos",
-      "name": "fk_todos_user_id_user_id_fk",
-      "columns": [
-        "user_id"
-      ],
-      "tableTo": "user",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
       "nameExplicit": false,
       "entityType": "fks"
     },
@@ -2556,6 +3103,24 @@
       "entityType": "pks"
     },
     {
+      "table": "stock_transfer",
+      "name": "stock_transfer_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "sub_warehouse",
+      "name": "sub_warehouse_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
       "table": "team",
       "name": "team_pk",
       "columns": [
@@ -2576,15 +3141,6 @@
     {
       "table": "usage_record",
       "name": "usage_record_pk",
-      "columns": [
-        "id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "todos",
-      "name": "todos_pk",
       "columns": [
         "id"
       ],
@@ -2732,13 +3288,37 @@
     {
       "table": "stock_movement",
       "name": "stock_movement_type_check",
-      "value": "\"type\" in ('initial', 'inbound', 'consumption', 'revoke', 'adjustment')",
+      "value": "\"type\" in ('initial', 'inbound', 'consumption', 'revoke', 'adjustment', 'transfer_in', 'transfer_out')",
       "entityType": "checks"
     },
     {
       "table": "stock_movement",
       "name": "stock_movement_stock_after_non_negative",
       "value": "\"stock_after\" >= 0",
+      "entityType": "checks"
+    },
+    {
+      "table": "stock_transfer",
+      "name": "stock_transfer_quantity_positive",
+      "value": "\"quantity\" > 0",
+      "entityType": "checks"
+    },
+    {
+      "table": "stock_transfer",
+      "name": "stock_transfer_warehouses_differ",
+      "value": "\"from_sub_warehouse_id\" <> \"to_sub_warehouse_id\"",
+      "entityType": "checks"
+    },
+    {
+      "table": "sub_warehouse",
+      "name": "sub_warehouse_status_check",
+      "value": "\"status\" in ('active', 'archived')",
+      "entityType": "checks"
+    },
+    {
+      "table": "sub_warehouse",
+      "name": "sub_warehouse_name_length",
+      "value": "length(trim(\"name\")) between 1 and 60",
       "entityType": "checks"
     },
     {
@@ -2778,9 +3358,15 @@
       "entityType": "checks"
     },
     {
-      "table": "todos",
-      "name": "todos_title_length",
-      "value": "length(trim(\"title\")) between 1 and 200",
+      "table": "usage_record",
+      "name": "usage_record_time_format",
+      "value": "\"used_at_time\" is null or \"used_at_time\" glob '[0-2][0-9]:[0-5][0-9]'",
+      "entityType": "checks"
+    },
+    {
+      "table": "usage_record",
+      "name": "usage_record_backfill_reason",
+      "value": "\"is_backfill\" = 0 or (\"backfill_reason\" is not null and length(trim(\"backfill_reason\")) between 2 and 300)",
       "entityType": "checks"
     }
   ],

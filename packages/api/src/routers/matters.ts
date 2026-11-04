@@ -5,14 +5,14 @@ import { and, eq, ne, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import type { Database } from "@handoverkit/db";
-import { item, matter } from "@handoverkit/db/schema/handover";
+import { item, matter, subWarehouse } from "@handoverkit/db/schema/handover";
 
 import {
   assertMatterAccess,
   assertTeamAccess,
   resolveTeamId,
 } from "#src/authz.ts";
-import { toItemDto } from "#src/dto.ts";
+import { toItemDto, toSubWarehouseDto } from "#src/dto.ts";
 import type { MatterDto } from "#src/dto.ts";
 import { todayInTimeZone } from "#src/lib/dates.ts";
 import {
@@ -146,7 +146,12 @@ export const mattersRouter = {
     }),
 
   byToken: protectedProcedure
-    .input(z.object({ token: z.string().trim().min(16).max(128) }))
+    .input(
+      z.object({
+        subWarehouseId: z.string().min(1).optional(),
+        token: z.string().trim().min(16).max(128),
+      })
+    )
     .handler(({ context, input }) => {
       const [row] = context.db
         .select()
@@ -173,7 +178,36 @@ export const mattersRouter = {
       }
 
       const recordDate = todayInTimeZone(teamRow.timezone);
-      const record = ensureRecord(context.db, row.id, recordDate);
+
+      const warehouseRows = context.db
+        .select()
+        .from(subWarehouse)
+        .where(
+          and(
+            eq(subWarehouse.matterId, row.id),
+            eq(subWarehouse.status, "active")
+          )
+        )
+        .orderBy(subWarehouse.sortOrder, subWarehouse.createdAt)
+        .all();
+
+      const selected =
+        input.subWarehouseId === undefined
+          ? warehouseRows[0]
+          : warehouseRows.find(
+              (warehouse) => warehouse.id === input.subWarehouseId
+            );
+
+      if (selected === undefined) {
+        throw new ORPCError("NOT_FOUND", {
+          message:
+            input.subWarehouseId === undefined
+              ? "该事项还没有可用子仓库"
+              : "子仓库不存在",
+        });
+      }
+
+      const record = ensureRecord(context.db, row.id, selected.id, recordDate);
 
       const items = context.db
         .select()
@@ -182,9 +216,45 @@ export const mattersRouter = {
         .orderBy(item.createdAt)
         .all();
 
+      const warehouseNames = new Map(
+        context.db
+          .select({ id: subWarehouse.id, name: subWarehouse.name })
+          .from(subWarehouse)
+          .where(eq(subWarehouse.matterId, row.id))
+          .all()
+          .map((warehouse) => [warehouse.id, warehouse.name])
+      );
+
+      const warehouseStats = context.db
+        .select({
+          itemCount: sql<number>`count(${item.id})`,
+          subWarehouseId: item.subWarehouseId,
+          totalStock: sql<number>`coalesce(sum(${item.stock}), 0)`,
+        })
+        .from(item)
+        .where(and(eq(item.matterId, row.id), eq(item.status, "active")))
+        .groupBy(item.subWarehouseId)
+        .all();
+
+      const statsById = new Map(
+        warehouseStats.map((stat) => [stat.subWarehouseId, stat])
+      );
+
       return {
-        items: items.map(toItemDto),
+        items: items.map((itemRow) =>
+          toItemDto(itemRow, warehouseNames.get(itemRow.subWarehouseId) ?? "")
+        ),
         matter: loadMatterDto(context.db, row, recordDate),
+        selectedSubWarehouseId: selected.id,
+        subWarehouses: warehouseRows.map((warehouse) => {
+          const stat = statsById.get(warehouse.id);
+
+          return toSubWarehouseDto(
+            warehouse,
+            stat?.itemCount ?? 0,
+            stat?.totalStock ?? 0
+          );
+        }),
         team: loadTeamDto(context.db, teamRow),
         today: loadRecordDetail(context.db, context.user, record),
       };
@@ -215,23 +285,36 @@ export const mattersRouter = {
       }
 
       try {
-        const [created] = context.db
-          .insert(matter)
-          .values({
-            code,
-            description: nullableText(input.description),
-            name: input.name,
-            qrToken: generateQrToken(),
-            teamId,
-          })
-          .returning()
-          .all();
+        const created = context.db.transaction((tx) => {
+          const [matterRow] = tx
+            .insert(matter)
+            .values({
+              code,
+              description: nullableText(input.description),
+              name: input.name,
+              qrToken: generateQrToken(),
+              teamId,
+            })
+            .returning()
+            .all();
 
-        if (created === undefined) {
-          throw new ORPCError("CONFLICT", {
-            message: "交接事项创建失败，请重试",
-          });
-        }
+          if (matterRow === undefined) {
+            throw new ORPCError("CONFLICT", {
+              message: "交接事项创建失败，请重试",
+            });
+          }
+
+          tx.insert(subWarehouse)
+            .values({
+              id: randomUUID(),
+              matterId: matterRow.id,
+              name: "主仓库",
+              sortOrder: 0,
+            })
+            .run();
+
+          return matterRow;
+        });
 
         return toMatterDtoWithToday(context.db, created);
       } catch (error) {

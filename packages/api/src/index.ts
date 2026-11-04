@@ -7,6 +7,7 @@ import { mattersRouter } from "#src/routers/matters.ts";
 import { meRouter } from "#src/routers/me.ts";
 import { recordsRouter } from "#src/routers/records.ts";
 import { statsRouter } from "#src/routers/stats.ts";
+import { subWarehousesRouter } from "#src/routers/sub-warehouses.ts";
 import { teamsRouter } from "#src/routers/teams.ts";
 import { usageRouter } from "#src/routers/usage.ts";
 import { usersRouter } from "#src/routers/users.ts";
@@ -21,6 +22,7 @@ export const appRouter = {
   me: meRouter,
   records: recordsRouter,
   stats: statsRouter,
+  subWarehouses: subWarehousesRouter,
   teams: teamsRouter,
   usage: usageRouter,
   users: usersRouter,

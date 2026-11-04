@@ -1,7 +1,7 @@
 import { ORPCError } from "@orpc/server";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
-import { matter, team } from "@handoverkit/db/schema/handover";
+import { matter, subWarehouse, team } from "@handoverkit/db/schema/handover";
 
 import type { Profile, Context } from "#src/context.ts";
 
@@ -116,4 +116,82 @@ export const assertMatterAccess = async (
   assertTeamAccess(profile, row.teamId);
 
   return row;
+};
+
+export interface SubWarehouseAccess {
+  id: string;
+  matterId: string;
+  teamId: string;
+  name: string;
+  status: string;
+}
+
+/** 取子仓库并校验团队隔离；越权统一 NOT_FOUND。 */
+export const assertSubWarehouseAccess = async (
+  db: Context["db"],
+  profile: Profile,
+  id: string
+): Promise<SubWarehouseAccess> => {
+  const [row] = await db
+    .select({
+      id: subWarehouse.id,
+      matterId: subWarehouse.matterId,
+      name: subWarehouse.name,
+      status: subWarehouse.status,
+      teamId: matter.teamId,
+    })
+    .from(subWarehouse)
+    .innerJoin(matter, eq(subWarehouse.matterId, matter.id))
+    .where(eq(subWarehouse.id, id))
+    .limit(1);
+
+  if (!row) {
+    throw new ORPCError("NOT_FOUND", { message: "子仓库不存在" });
+  }
+
+  assertTeamAccess(profile, row.teamId);
+
+  return row;
+};
+
+/** 未显式指定子仓库时取该事项最早创建且启用的子仓库。 */
+export const resolveSubWarehouseId = async (
+  db: Context["db"],
+  profile: Profile,
+  matterId: string,
+  requestedId?: string
+): Promise<string> => {
+  if (requestedId !== undefined) {
+    const access = await assertSubWarehouseAccess(db, profile, requestedId);
+
+    if (access.matterId !== matterId) {
+      throw new ORPCError("BAD_REQUEST", {
+        message: "子仓库不属于该交接事项",
+      });
+    }
+
+    if (access.status !== "active") {
+      throw new ORPCError("CONFLICT", { message: "子仓库已停用" });
+    }
+
+    return access.id;
+  }
+
+  const [first] = await db
+    .select({ id: subWarehouse.id })
+    .from(subWarehouse)
+    .where(
+      and(
+        eq(subWarehouse.matterId, matterId),
+        eq(subWarehouse.status, "active")
+      )
+    )
+    .orderBy(subWarehouse.sortOrder, subWarehouse.createdAt)
+    .limit(1);
+
+  if (first === undefined) {
+    throw new ORPCError("NOT_FOUND", { message: "该事项还没有可用子仓库" });
+  }
+
+  return first.id;
 };

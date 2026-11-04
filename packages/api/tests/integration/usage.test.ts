@@ -513,4 +513,170 @@ describe("usage", () => {
       otherAdmin.client.usage.pendingRevokes({})
     ).resolves.toHaveLength(0);
   });
+
+  it("补登记必须登录，并校验原因、日期与普通登记门禁", async () => {
+    const { gauze, matter, member } = await setup();
+
+    const anonymous = await captureOrpcError(
+      createClient().usage.backfill({
+        backfillReason: "匿名补录",
+        items: [{ itemId: gauze.id, quantity: 1 }],
+        matterId: matter.id,
+        patientName: "匿名",
+        patientNo: "B0",
+        patientType: "outpatient",
+        usedAt: "2026-05-01",
+        usedTime: "09:30",
+      })
+    );
+
+    const missingReason = await captureOrpcError(
+      member.client.usage.backfill({
+        backfillReason: "",
+        items: [{ itemId: gauze.id, quantity: 1 }],
+        matterId: matter.id,
+        patientName: "补录患者",
+        patientNo: "B1",
+        patientType: "outpatient",
+        usedAt: "2026-05-01",
+        usedTime: "09:30",
+      })
+    );
+
+    const future = await captureOrpcError(
+      member.client.usage.backfill({
+        backfillReason: "未来补录",
+        items: [{ itemId: gauze.id, quantity: 1 }],
+        matterId: matter.id,
+        patientName: "补录患者",
+        patientNo: "B2",
+        patientType: "outpatient",
+        usedAt: "2099-01-01",
+        usedTime: "09:30",
+      })
+    );
+
+    const normalBlocked = await captureOrpcError(
+      member.client.usage.create({
+        items: [{ itemId: gauze.id, quantity: 1 }],
+        matterId: matter.id,
+        patientName: "补录患者",
+        patientNo: "B3",
+        patientType: "outpatient",
+        usedAt: "2026-05-01",
+      })
+    );
+
+    expect([
+      anonymous.code,
+      missingReason.code,
+      future.code,
+      normalBlocked.code,
+    ]).toStrictEqual([
+      "UNAUTHORIZED",
+      "BAD_REQUEST",
+      "BAD_REQUEST",
+      "CONFLICT",
+    ]);
+  });
+
+  it("补登记记录使用时间与原因，并扣减来源库存", async () => {
+    const { gauze, listItems, matter, member, teamAdmin } = await setup();
+
+    const created = await member.client.usage.backfill({
+      backfillReason: "下班后补录，接班时未登记",
+      items: [{ itemId: gauze.id, quantity: 2 }],
+      matterId: matter.id,
+      patientName: "补录患者",
+      patientNo: "B4",
+      patientType: "outpatient",
+      usedAt: "2026-05-01",
+      usedTime: "09:30",
+    });
+
+    expect({
+      backfillReason: created.backfillReason,
+      isBackfill: created.isBackfill,
+      item: created.items[0],
+      recordId: created.recordId,
+      usedAtTime: created.usedAtTime,
+    }).toStrictEqual({
+      backfillReason: "下班后补录，接班时未登记",
+      isBackfill: true,
+      item: {
+        itemId: gauze.id,
+        itemName: "纱布",
+        itemSpec: null,
+        quantity: 2,
+        sourceSubWarehouseName: "主仓库",
+        unit: "包",
+      },
+      recordId: null,
+      usedAtTime: "09:30",
+    });
+
+    const rows = await listItems();
+    expect(rows.find((row) => row.id === gauze.id)?.stock).toBe(8);
+
+    const movements = await teamAdmin.client.items.movements({
+      itemId: gauze.id,
+    });
+
+    expect(movements[0]?.note).toContain("补录");
+  });
+
+  it("补登记受跨团队隔离与库存校验", async () => {
+    const { gauze, listItems, matter, member } = await setup();
+
+    await member.client.usage.backfill({
+      backfillReason: "补录基线",
+      items: [{ itemId: gauze.id, quantity: 2 }],
+      matterId: matter.id,
+      patientName: "补录患者",
+      patientNo: "B5",
+      patientType: "outpatient",
+      usedAt: "2026-05-01",
+      usedTime: "09:30",
+    });
+
+    const otherTeam = createTeamFixture(db);
+
+    const otherAdmin = await createTestUser({
+      role: "team_admin",
+      teamId: otherTeam.id,
+    });
+
+    const crossTeam = await captureOrpcError(
+      otherAdmin.client.usage.backfill({
+        backfillReason: "越权补录",
+        items: [{ itemId: gauze.id, quantity: 1 }],
+        matterId: matter.id,
+        patientName: "越权",
+        patientNo: "B6",
+        patientType: "outpatient",
+        usedAt: "2026-05-01",
+        usedTime: "09:30",
+      })
+    );
+
+    const insufficient = await captureOrpcError(
+      member.client.usage.backfill({
+        backfillReason: "超量补录",
+        items: [{ itemId: gauze.id, quantity: 999 }],
+        matterId: matter.id,
+        patientName: "补录患者",
+        patientNo: "B7",
+        patientType: "outpatient",
+        usedAt: "2026-05-01",
+        usedTime: "10:00",
+      })
+    );
+
+    const rows = await listItems();
+    expect([crossTeam.code, insufficient.code]).toStrictEqual([
+      "NOT_FOUND",
+      "CONFLICT",
+    ]);
+    expect(rows.find((row) => row.id === gauze.id)?.stock).toBe(8);
+  });
 });

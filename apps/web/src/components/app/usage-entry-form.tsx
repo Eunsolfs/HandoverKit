@@ -28,6 +28,8 @@ interface UsageEntryItem {
 
 export interface UsageEntryValue {
   usedAt: string;
+  usedTime: string | null;
+  backfillReason: string | null;
   patientName: string;
   patientType: PatientInfo["patientType"];
   patientNo: string;
@@ -40,6 +42,8 @@ export interface UsageEntryValue {
 interface EntryErrors {
   items?: string;
   usedAt?: string;
+  usedTime?: string;
+  backfillReason?: string;
   operatorName?: string;
   patient: PatientFieldErrors;
 }
@@ -57,6 +61,8 @@ interface UsageEntryFormProps {
   items: PickerItem[];
   defaultOperatorName: string;
   defaultUsedAt?: string;
+  /** backfill 模式额外要求使用时间与补录原因。 */
+  mode?: "normal" | "backfill";
   pending?: boolean;
   submitLabel?: string;
   onSubmit: (value: UsageEntryValue) => void;
@@ -67,13 +73,17 @@ export const UsageEntryForm = ({
   defaultOperatorName,
   defaultUsedAt,
   items,
+  mode = "normal",
   onSubmit,
   pending = false,
   submitLabel = "提交登记",
 }: UsageEntryFormProps) => {
+  const isBackfill = mode === "backfill";
   const [patient, setPatient] = useState<PatientInfo>(EMPTY_PATIENT_INFO);
   const [rows, setRows] = useState<UsageRow[]>([NEW_ROW]);
   const [usedAt, setUsedAt] = useState(defaultUsedAt ?? toLocalDateString());
+  const [usedTime, setUsedTime] = useState("");
+  const [backfillReason, setBackfillReason] = useState("");
   const [operatorName, setOperatorName] = useState(defaultOperatorName);
   const [note, setNote] = useState("");
   const [errors, setErrors] = useState<EntryErrors>(EMPTY_ERRORS);
@@ -90,6 +100,7 @@ export const UsageEntryForm = ({
     );
   };
 
+  // eslint-disable-next-line complexity
   const handleSubmit = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
 
@@ -126,6 +137,14 @@ export const UsageEntryForm = ({
       nextErrors.usedAt = "请选择使用日期";
     }
 
+    if (isBackfill && usedTime.length === 0) {
+      nextErrors.usedTime = "请选择使用时间";
+    }
+
+    if (isBackfill && backfillReason.trim().length < 2) {
+      nextErrors.backfillReason = "请填写补录原因（至少 2 个字）";
+    }
+
     if (operatorName.trim().length === 0) {
       nextErrors.operatorName = "请填写操作员姓名";
     }
@@ -136,6 +155,8 @@ export const UsageEntryForm = ({
       Object.keys(patientErrors).length > 0 ||
       nextErrors.items !== undefined ||
       nextErrors.usedAt !== undefined ||
+      nextErrors.usedTime !== undefined ||
+      nextErrors.backfillReason !== undefined ||
       nextErrors.operatorName !== undefined
     ) {
       return;
@@ -144,6 +165,7 @@ export const UsageEntryForm = ({
     const phone = patient.patientPhone.trim();
 
     onSubmit({
+      backfillReason: isBackfill ? backfillReason.trim() : null,
       items: payloadItems,
       note: note.trim().length === 0 ? null : note.trim(),
       operatorName: operatorName.trim(),
@@ -152,6 +174,7 @@ export const UsageEntryForm = ({
       patientPhone: phone.length === 0 ? null : phone,
       patientType: patient.patientType,
       usedAt,
+      usedTime: isBackfill ? usedTime : null,
     });
   };
 
@@ -264,6 +287,26 @@ export const UsageEntryForm = ({
             />
           )}
         </FormField>
+        {isBackfill ? (
+          <FormField
+            error={errors.usedTime}
+            id="usage-used-time"
+            label="使用时间"
+            required
+          >
+            {(field) => (
+              <Input
+                {...field}
+                disabled={pending}
+                onChange={(event) => {
+                  setUsedTime(event.target.value);
+                }}
+                type="time"
+                value={usedTime}
+              />
+            )}
+          </FormField>
+        ) : null}
         <FormField
           error={errors.operatorName}
           id="usage-operator"
@@ -284,7 +327,30 @@ export const UsageEntryForm = ({
         </FormField>
       </section>
 
-      <FormField hint="选填，例如补登记说明" id="usage-note" label="备注">
+      {isBackfill ? (
+        <FormField
+          error={errors.backfillReason}
+          hint="补录不受接班门禁限制，但必须说明原因，例如：下班后补录、系统故障补录"
+          id="usage-backfill-reason"
+          label="补录原因"
+          required
+        >
+          {(field) => (
+            <Textarea
+              {...field}
+              disabled={pending}
+              maxLength={300}
+              onChange={(event) => {
+                setBackfillReason(event.target.value);
+              }}
+              placeholder="请填写补录原因"
+              value={backfillReason}
+            />
+          )}
+        </FormField>
+      ) : null}
+
+      <FormField hint="选填" id="usage-note" label="备注">
         {(field) => (
           <Textarea
             {...field}

@@ -7,6 +7,7 @@ import {
   handoverRecord,
   handoverRecordItem,
   item,
+  subWarehouse,
   matter,
   revokeRequest,
   team,
@@ -66,13 +67,19 @@ const toCountMap = <K>(rows: { key: K; value: number }[]): Map<K, number> => {
   return map;
 };
 
-const usageCount = (db: Database, matterId: string, recordDate: string) =>
+const usageCount = (
+  db: Database,
+  matterId: string,
+  subWarehouseId: string,
+  recordDate: string
+) =>
   db
     .select({ value: count() })
     .from(usageRecord)
     .where(
       and(
         eq(usageRecord.matterId, matterId),
+        eq(usageRecord.subWarehouseId, subWarehouseId),
         eq(usageRecord.usedAt, recordDate)
       )
     )
@@ -144,6 +151,23 @@ export const loadProfileDtos = (
   );
 };
 
+const loadSubWarehouseNames = (
+  db: Database,
+  ids: string[]
+): Map<string, string> => {
+  if (ids.length === 0) {
+    return new Map();
+  }
+
+  const rows = db
+    .select({ id: subWarehouse.id, name: subWarehouse.name })
+    .from(subWarehouse)
+    .where(inArray(subWarehouse.id, ids))
+    .all();
+
+  return new Map(rows.map((row) => [row.id, row.name]));
+};
+
 const loadMatterNames = (
   db: Database,
   matterIds: string[]
@@ -208,8 +232,19 @@ export const loadMatterDtos = (
 
   const statusMap = new Map<string, RecordStatus>();
 
+  const priority: Record<RecordStatus, number> = {
+    accepted: 1,
+    handover_submitted: 2,
+    pending_acceptance: 0,
+  };
+
   for (const row of statusRows) {
-    statusMap.set(row.matterId, toRecordStatus(row.status));
+    const next = toRecordStatus(row.status);
+    const current = statusMap.get(row.matterId);
+
+    if (current === undefined || priority[next] < priority[current]) {
+      statusMap.set(row.matterId, next);
+    }
   }
 
   return rows.map((row) =>
@@ -236,14 +271,21 @@ export const loadMatterDto = (
   return dto;
 };
 
-const groupUsageItems = (rows: UsageItemRow[]): Map<string, UsageItemRow[]> => {
-  const map = new Map<string, UsageItemRow[]>();
+interface UsageItemWithSource {
+  row: UsageItemRow;
+  sourceSubWarehouseName: string;
+}
+
+const groupUsageItemsWithSource = (
+  rows: UsageItemWithSource[]
+): Map<string, UsageItemWithSource[]> => {
+  const map = new Map<string, UsageItemWithSource[]>();
 
   for (const row of rows) {
-    const bucket = map.get(row.usageId);
+    const bucket = map.get(row.row.usageId);
 
     if (bucket === undefined) {
-      map.set(row.usageId, [row]);
+      map.set(row.row.usageId, [row]);
     } else {
       bucket.push(row);
     }
@@ -279,14 +321,28 @@ export const loadUsageDtos = (db: Database, rows: UsageRow[]): UsageDto[] => {
   }
 
   const matterNames = loadMatterNames(db, matterIds);
+  const subWarehouseIds: string[] = [];
 
-  const itemsByUsage = groupUsageItems(
-    db
-      .select()
-      .from(usageItem)
-      .where(inArray(usageItem.usageId, usageIds))
-      .all()
-  );
+  for (const row of rows) {
+    if (!subWarehouseIds.includes(row.subWarehouseId)) {
+      subWarehouseIds.push(row.subWarehouseId);
+    }
+  }
+
+  const subWarehouseNames = loadSubWarehouseNames(db, subWarehouseIds);
+
+  const itemRows = db
+    .select({
+      row: usageItem,
+      sourceSubWarehouseName: subWarehouse.name,
+    })
+    .from(usageItem)
+    .innerJoin(item, eq(usageItem.itemId, item.id))
+    .innerJoin(subWarehouse, eq(item.subWarehouseId, subWarehouse.id))
+    .where(inArray(usageItem.usageId, usageIds))
+    .all();
+
+  const itemsByUsage = groupUsageItemsWithSource(itemRows);
 
   const latestRevokes = latestRevokeByUsage(
     db
@@ -301,6 +357,7 @@ export const loadUsageDtos = (db: Database, rows: UsageRow[]): UsageDto[] => {
     toUsageDto(
       row,
       matterNames.get(row.matterId) ?? "",
+      subWarehouseNames.get(row.subWarehouseId) ?? "",
       itemsByUsage.get(row.id) ?? [],
       latestRevokes.get(row.id) ?? null
     )
@@ -360,6 +417,7 @@ export const loadRecordSummaries = (
 
   const recordIds: string[] = [];
   const matterIds: string[] = [];
+  const subWarehouseIds: string[] = [];
   const pairConditions = [];
 
   for (const row of rows) {
@@ -369,15 +427,20 @@ export const loadRecordSummaries = (
       matterIds.push(row.matterId);
     }
 
+    if (!subWarehouseIds.includes(row.subWarehouseId)) {
+      subWarehouseIds.push(row.subWarehouseId);
+    }
+
     pairConditions.push(
       and(
-        eq(usageRecord.matterId, row.matterId),
+        eq(usageRecord.subWarehouseId, row.subWarehouseId),
         eq(usageRecord.usedAt, row.recordDate)
       )
     );
   }
 
   const matterNames = loadMatterNames(db, matterIds);
+  const subWarehouseNames = loadSubWarehouseNames(db, subWarehouseIds);
 
   const itemCounts = toCountMap(
     db
@@ -410,13 +473,13 @@ export const loadRecordSummaries = (
 
   const usageCountRows = db
     .select({
-      key: usageRecord.matterId,
+      key: usageRecord.subWarehouseId,
       usedAt: usageRecord.usedAt,
       value: count(),
     })
     .from(usageRecord)
     .where(or(...pairConditions))
-    .groupBy(usageRecord.matterId, usageRecord.usedAt)
+    .groupBy(usageRecord.subWarehouseId, usageRecord.usedAt)
     .all();
 
   const usageCounts = new Map<string, number>();
@@ -429,10 +492,11 @@ export const loadRecordSummaries = (
     toRecordSummaryDto(
       row,
       matterNames.get(row.matterId) ?? "",
+      subWarehouseNames.get(row.subWarehouseId) ?? "",
       itemCounts.get(row.id) ?? 0,
       diffCounts.get(row.id) ?? 0,
-      usageCounts.get(`${row.matterId}|${row.recordDate}`) ??
-        usageCount(db, row.matterId, row.recordDate)
+      usageCounts.get(`${row.subWarehouseId}|${row.recordDate}`) ??
+        usageCount(db, row.matterId, row.subWarehouseId, row.recordDate)
     )
   );
 };
@@ -443,6 +507,10 @@ export const loadRecordDetail = (
   row: RecordRow
 ): RecordDetailDto => {
   const matterNames = loadMatterNames(db, [row.matterId]);
+
+  const subWarehouseName =
+    loadSubWarehouseNames(db, [row.subWarehouseId]).get(row.subWarehouseId) ??
+    "";
 
   const items = db
     .select()
@@ -456,6 +524,7 @@ export const loadRecordDetail = (
     .where(
       and(
         eq(usageRecord.matterId, row.matterId),
+        eq(usageRecord.subWarehouseId, row.subWarehouseId),
         eq(usageRecord.usedAt, row.recordDate)
       )
     )
@@ -503,12 +572,12 @@ export const loadRecordDetail = (
     acceptanceDiffCount > 0 && exceptionRows.length === 0;
 
   const canRegisterUsage =
-    (row.status === "accepted" || row.status === "handover_submitted") &&
-    !requiresExceptionReport;
+    row.status === "accepted" && !requiresExceptionReport;
 
   const summary = toRecordSummaryDto(
     row,
     matterNames.get(row.matterId) ?? "",
+    subWarehouseName,
     items.length,
     diffCount,
     usageRows.length
@@ -520,7 +589,7 @@ export const loadRecordDetail = (
     permissions: {
       canAccept: row.status === "pending_acceptance",
       canDelete: isAdmin(profile) && usageRows.length === 0,
-      canHandover: row.status === "accepted",
+      canHandover: row.status === "accepted" && !requiresExceptionReport,
       canRegisterUsage,
       requiresExceptionReport,
     },

@@ -14,7 +14,7 @@ type RecordRow = typeof handoverRecord.$inferSelect;
 
 const findRecord = (
   db: Database,
-  matterId: string,
+  subWarehouseId: string,
   recordDate: string
 ): RecordRow | undefined =>
   db
@@ -22,7 +22,7 @@ const findRecord = (
     .from(handoverRecord)
     .where(
       and(
-        eq(handoverRecord.matterId, matterId),
+        eq(handoverRecord.subWarehouseId, subWarehouseId),
         eq(handoverRecord.recordDate, recordDate)
       )
     )
@@ -35,9 +35,10 @@ const findRecord = (
 export const ensureRecord = (
   db: Database,
   matterId: string,
+  subWarehouseId: string,
   recordDate: string
 ): RecordRow => {
-  const existing = findRecord(db, matterId, recordDate);
+  const existing = findRecord(db, subWarehouseId, recordDate);
 
   if (existing !== undefined) {
     return existing;
@@ -48,13 +49,18 @@ export const ensureRecord = (
   try {
     db.transaction((tx) => {
       tx.insert(handoverRecord)
-        .values({ id: recordId, matterId, recordDate })
+        .values({ id: recordId, matterId, recordDate, subWarehouseId })
         .run();
 
       const items = tx
         .select()
         .from(item)
-        .where(and(eq(item.matterId, matterId), eq(item.status, "active")))
+        .where(
+          and(
+            eq(item.subWarehouseId, subWarehouseId),
+            eq(item.status, "active")
+          )
+        )
         .orderBy(item.createdAt)
         .all();
 
@@ -75,7 +81,7 @@ export const ensureRecord = (
       }
     });
   } catch (error) {
-    const raced = findRecord(db, matterId, recordDate);
+    const raced = findRecord(db, subWarehouseId, recordDate);
 
     if (raced !== undefined) {
       return raced;
@@ -86,7 +92,7 @@ export const ensureRecord = (
       : new Error("交接记录创建失败，请重试", { cause: error });
   }
 
-  const created = findRecord(db, matterId, recordDate);
+  const created = findRecord(db, subWarehouseId, recordDate);
 
   if (created === undefined) {
     throw new ORPCError("CONFLICT", { message: "交接记录创建失败，请重试" });

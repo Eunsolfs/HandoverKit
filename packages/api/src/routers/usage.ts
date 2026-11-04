@@ -13,6 +13,7 @@ import {
   matter,
   revokeRequest,
   stockMovement,
+  subWarehouse,
   usageItem,
   usageRecord,
 } from "@handoverkit/db/schema/handover";
@@ -21,12 +22,13 @@ import {
   assertMatterAccess,
   assertMatterActive,
   assertTeamAccess,
+  resolveSubWarehouseId,
   resolveTeamId,
 } from "#src/authz.ts";
 import type { Profile } from "#src/context.ts";
 import { toRevokeRequestDto } from "#src/dto.ts";
-import { calendarDateSchema } from "#src/lib/dates.ts";
-import { loadUsageDto, loadUsageDtos } from "#src/lib/loaders.ts";
+import { calendarDateSchema, todayInTimeZone } from "#src/lib/dates.ts";
+import { loadTeamRow, loadUsageDto, loadUsageDtos } from "#src/lib/loaders.ts";
 import { adminProcedure, protectedProcedure } from "#src/procedures.ts";
 
 type UsageRow = typeof usageRecord.$inferSelect;
@@ -86,26 +88,291 @@ const requireRevokeRow = (db: Database, id: string): RevokeRow => {
 const usageConflict = (message: string) =>
   new ORPCError("CONFLICT", { message });
 
+const usageBaseInput = z.object({
+  items: z
+    .array(
+      z.object({
+        itemId: z.string().min(1),
+        quantity: z.number().int().min(1).max(100_000),
+      })
+    )
+    .min(1),
+  matterId: z.string().min(1),
+  subWarehouseId: z.string().min(1).optional(),
+  note: z.string().trim().max(300).nullish(),
+  operatorName: z.string().trim().max(40).optional(),
+  patientName: z.string().trim().min(1).max(40),
+  patientNo: z.string().trim().min(1).max(40),
+  patientPhone: z.string().trim().max(20).nullish(),
+  patientType: z.enum(["outpatient", "inpatient"]),
+  usedAt: calendarDateSchema,
+});
+
+interface UsageWriteOptions {
+  matterId: string;
+  subWarehouseId: string;
+  items: { itemId: string; quantity: number }[];
+  note: string | null;
+  operatorName: string | undefined;
+  patientName: string;
+  patientNo: string;
+  patientPhone: string | null;
+  patientType: "outpatient" | "inpatient";
+  usedAt: string;
+  usedAtTime: string | null;
+  isBackfill: boolean;
+  backfillReason: string | null;
+  recordId: string | null;
+  movementNote: string | null;
+}
+
+/** 普通登记与补登记共用的写入逻辑：校验物品、事务扣库存、写明细与流水。 */
+const writeUsage = (
+  db: Database,
+  user: Profile,
+  options: UsageWriteOptions
+): string => {
+  const usageId = randomUUID();
+  const operatorName = options.operatorName ?? user.name;
+  const now = new Date();
+  const seen = new Set<string>();
+
+  for (const line of options.items) {
+    if (seen.has(line.itemId)) {
+      throw new ORPCError("BAD_REQUEST", {
+        message: "同一物品不能重复登记",
+      });
+    }
+
+    seen.add(line.itemId);
+  }
+
+  db.transaction((tx) => {
+    const lines: {
+      row: typeof item.$inferSelect;
+      quantity: number;
+    }[] = [];
+
+    for (const line of options.items) {
+      const [itemRow] = tx
+        .select()
+        .from(item)
+        .where(
+          and(eq(item.id, line.itemId), eq(item.matterId, options.matterId))
+        )
+        .all();
+
+      if (itemRow === undefined) {
+        throw new ORPCError("NOT_FOUND", { message: "物品不存在" });
+      }
+
+      if (itemRow.status !== "active") {
+        throw new ORPCError("BAD_REQUEST", {
+          message: `物品「${itemRow.name}」已停用，不能登记消耗`,
+        });
+      }
+
+      const [sourceWarehouse] = tx
+        .select({ name: subWarehouse.name, status: subWarehouse.status })
+        .from(subWarehouse)
+        .where(eq(subWarehouse.id, itemRow.subWarehouseId))
+        .all();
+
+      if (
+        sourceWarehouse === undefined ||
+        sourceWarehouse.status !== "active"
+      ) {
+        throw new ORPCError("BAD_REQUEST", {
+          message: `物品「${itemRow.name}」所在子仓库已停用，不能登记消耗`,
+        });
+      }
+
+      lines.push({ quantity: line.quantity, row: itemRow });
+    }
+
+    tx.insert(usageRecord)
+      .values({
+        backfillReason: options.backfillReason,
+        id: usageId,
+        isBackfill: options.isBackfill,
+        matterId: options.matterId,
+        subWarehouseId: options.subWarehouseId,
+        note: options.note,
+        operatorName,
+        operatorUserId: user.id,
+        patientName: options.patientName,
+        patientNo: options.patientNo,
+        patientPhone: options.patientPhone,
+        patientType: options.patientType,
+        recordId: options.recordId,
+        usedAt: options.usedAt,
+        usedAtTime: options.usedAtTime,
+      })
+      .run();
+
+    for (const line of lines) {
+      const [updatedItem] = tx
+        .update(item)
+        .set({
+          stock: sql`${item.stock} - ${line.quantity}`,
+          updatedAt: now,
+        })
+        .where(
+          and(eq(item.id, line.row.id), sql`${item.stock} >= ${line.quantity}`)
+        )
+        .returning()
+        .all();
+
+      if (updatedItem === undefined) {
+        throw usageConflict(`库存不足：${line.row.name}`);
+      }
+
+      tx.insert(usageItem)
+        .values({
+          id: randomUUID(),
+          itemId: line.row.id,
+          itemName: line.row.name,
+          itemSpec: line.row.spec,
+          quantity: line.quantity,
+          unit: line.row.unit,
+          usageId,
+        })
+        .run();
+
+      tx.insert(stockMovement)
+        .values({
+          id: randomUUID(),
+          itemId: line.row.id,
+          matterId: options.matterId,
+          note: options.movementNote,
+          subWarehouseId: options.subWarehouseId,
+          operatorName,
+          operatorUserId: user.id,
+          quantityDelta: -line.quantity,
+          refId: usageId,
+          refType: "usage",
+          stockAfter: updatedItem.stock,
+          type: "consumption",
+        })
+        .run();
+    }
+  });
+
+  return usageId;
+};
+
 export const usageRouter = {
   create: protectedProcedure
-    .input(
-      z.object({
-        items: z
-          .array(
-            z.object({
-              itemId: z.string().min(1),
-              quantity: z.number().int().min(1).max(100_000),
-            })
+    .input(usageBaseInput)
+    .handler(async ({ context, input }) => {
+      const matterAccess = await assertMatterAccess(
+        context.db,
+        context.user,
+        input.matterId
+      );
+
+      assertMatterActive(matterAccess);
+
+      const subWarehouseId = await resolveSubWarehouseId(
+        context.db,
+        context.user,
+        input.matterId,
+        input.subWarehouseId
+      );
+
+      const [record] = context.db
+        .select({ id: handoverRecord.id, status: handoverRecord.status })
+        .from(handoverRecord)
+        .where(
+          and(
+            eq(handoverRecord.matterId, input.matterId),
+            eq(handoverRecord.subWarehouseId, subWarehouseId),
+            eq(handoverRecord.recordDate, input.usedAt)
           )
-          .min(1),
-        matterId: z.string().min(1),
-        note: z.string().trim().max(300).nullish(),
-        operatorName: z.string().trim().max(40).optional(),
-        patientName: z.string().trim().min(1).max(40),
-        patientNo: z.string().trim().min(1).max(40),
-        patientPhone: z.string().trim().max(20).nullish(),
-        patientType: z.enum(["outpatient", "inpatient"]),
-        usedAt: calendarDateSchema,
+        )
+        .all();
+
+      if (record === undefined) {
+        throw usageConflict("该日期还没有交接记录，请先在扫码页完成接班核对");
+      }
+
+      if (record.status === "pending_acceptance") {
+        throw usageConflict("请先完成接班核对并确认接收，再登记用物");
+      }
+
+      if (record.status !== "accepted") {
+        throw usageConflict("当前班次已交班，请使用补登记功能");
+      }
+
+      const diffItems = context.db
+        .select({ id: handoverRecordItem.id })
+        .from(handoverRecordItem)
+        .where(
+          and(
+            eq(handoverRecordItem.recordId, record.id),
+            ne(handoverRecordItem.actualQty, handoverRecordItem.expectedQty)
+          )
+        )
+        .all();
+
+      if (diffItems.length > 0) {
+        const [reported] = context.db
+          .select({ id: exceptionEvent.id })
+          .from(exceptionEvent)
+          .where(eq(exceptionEvent.recordId, record.id))
+          .all();
+
+        if (reported === undefined) {
+          throw usageConflict(
+            `接班核对发现 ${diffItems.length} 项数量差异，请先提交异常上报后再登记用物`
+          );
+        }
+      }
+
+      const usageId = writeUsage(context.db, context.user, {
+        backfillReason: null,
+        isBackfill: false,
+        items: input.items,
+        matterId: input.matterId,
+        movementNote: null,
+        note: input.note ?? null,
+        operatorName: input.operatorName,
+        patientName: input.patientName,
+        patientNo: input.patientNo,
+        patientPhone: input.patientPhone ?? null,
+        patientType: input.patientType,
+        recordId: record.id,
+        subWarehouseId,
+        usedAt: input.usedAt,
+        usedAtTime: null,
+      });
+
+      const created = loadUsageRow(context.db, usageId);
+
+      if (created === undefined) {
+        throw new ORPCError("CONFLICT", {
+          message: "用物记录创建失败，请重试",
+        });
+      }
+
+      return loadUsageDto(context.db, created);
+    }),
+
+  /** 补登记：不要求当日已接班/未交班，但必须登录、记录使用时间与补录原因。 */
+  backfill: protectedProcedure
+    .input(
+      usageBaseInput.extend({
+        backfillReason: z
+          .string()
+          .trim()
+          .min(2, "请填写补录原因")
+          .max(300, "补录原因最多 300 字"),
+        usedTime: z
+          .string()
+          .regex(
+            /^(?<hour>[01][0-9]|2[0-3]):[0-5][0-9]$/u,
+            "使用时间格式应为 HH:mm"
+          ),
       })
     )
     .handler(async ({ context, input }) => {
@@ -117,165 +384,57 @@ export const usageRouter = {
 
       assertMatterActive(matterAccess);
 
-      const seen = new Set<string>();
+      const subWarehouseId = await resolveSubWarehouseId(
+        context.db,
+        context.user,
+        input.matterId,
+        input.subWarehouseId
+      );
 
-      for (const line of input.items) {
-        if (seen.has(line.itemId)) {
-          throw new ORPCError("BAD_REQUEST", {
-            message: "同一物品不能重复登记",
-          });
-        }
+      const teamRow = loadTeamRow(context.db, matterAccess.teamId);
+      const today = todayInTimeZone(teamRow?.timezone ?? "Asia/Shanghai");
 
-        seen.add(line.itemId);
+      if (input.usedAt > today) {
+        throw new ORPCError("BAD_REQUEST", {
+          message: "补录日期不能晚于今天",
+        });
       }
 
-      const usageId = randomUUID();
-      const operatorName = input.operatorName ?? context.user.name;
-      const now = new Date();
-
-      context.db.transaction((tx) => {
-        const lines: {
-          row: typeof item.$inferSelect;
-          quantity: number;
-        }[] = [];
-
-        for (const line of input.items) {
-          const [itemRow] = tx
-            .select()
-            .from(item)
-            .where(
-              and(eq(item.id, line.itemId), eq(item.matterId, input.matterId))
-            )
-            .all();
-
-          if (itemRow === undefined) {
-            throw new ORPCError("NOT_FOUND", { message: "物品不存在" });
-          }
-
-          if (itemRow.status !== "active") {
-            throw new ORPCError("BAD_REQUEST", {
-              message: `物品「${itemRow.name}」已停用，不能登记消耗`,
-            });
-          }
-
-          lines.push({ quantity: line.quantity, row: itemRow });
-        }
-
-        const [record] = tx
-          .select({ id: handoverRecord.id, status: handoverRecord.status })
-          .from(handoverRecord)
-          .where(
-            and(
-              eq(handoverRecord.matterId, input.matterId),
-              eq(handoverRecord.recordDate, input.usedAt)
-            )
+      const [record] = context.db
+        .select({ id: handoverRecord.id })
+        .from(handoverRecord)
+        .where(
+          and(
+            eq(handoverRecord.matterId, input.matterId),
+            eq(handoverRecord.subWarehouseId, subWarehouseId),
+            eq(handoverRecord.recordDate, input.usedAt)
           )
-          .all();
+        )
+        .all();
 
-        if (record === undefined) {
-          throw usageConflict("该日期还没有交接记录，请先在扫码页完成接班核对");
-        }
-
-        if (record.status === "pending_acceptance") {
-          throw usageConflict("请先完成接班核对并确认接收，再登记用物");
-        }
-
-        const diffItems = tx
-          .select({ id: handoverRecordItem.id })
-          .from(handoverRecordItem)
-          .where(
-            and(
-              eq(handoverRecordItem.recordId, record.id),
-              ne(handoverRecordItem.actualQty, handoverRecordItem.expectedQty)
-            )
-          )
-          .all();
-
-        if (diffItems.length > 0) {
-          const [reported] = tx
-            .select({ id: exceptionEvent.id })
-            .from(exceptionEvent)
-            .where(eq(exceptionEvent.recordId, record.id))
-            .all();
-
-          if (reported === undefined) {
-            throw usageConflict(
-              `接班核对发现 ${diffItems.length} 项数量差异，请先提交异常上报后再登记用物`
-            );
-          }
-        }
-
-        tx.insert(usageRecord)
-          .values({
-            id: usageId,
-            matterId: input.matterId,
-            note: input.note ?? null,
-            operatorName,
-            operatorUserId: context.user.id,
-            patientName: input.patientName,
-            patientNo: input.patientNo,
-            patientPhone: input.patientPhone ?? null,
-            patientType: input.patientType,
-            recordId: record.id,
-            usedAt: input.usedAt,
-          })
-          .run();
-
-        for (const line of lines) {
-          const [updatedItem] = tx
-            .update(item)
-            .set({
-              stock: sql`${item.stock} - ${line.quantity}`,
-              updatedAt: now,
-            })
-            .where(
-              and(
-                eq(item.id, line.row.id),
-                sql`${item.stock} >= ${line.quantity}`
-              )
-            )
-            .returning()
-            .all();
-
-          if (updatedItem === undefined) {
-            throw usageConflict(`库存不足：${line.row.name}`);
-          }
-
-          tx.insert(usageItem)
-            .values({
-              id: randomUUID(),
-              itemId: line.row.id,
-              itemName: line.row.name,
-              itemSpec: line.row.spec,
-              quantity: line.quantity,
-              unit: line.row.unit,
-              usageId,
-            })
-            .run();
-
-          tx.insert(stockMovement)
-            .values({
-              id: randomUUID(),
-              itemId: line.row.id,
-              matterId: input.matterId,
-              note: null,
-              operatorName,
-              operatorUserId: context.user.id,
-              quantityDelta: -line.quantity,
-              refId: usageId,
-              refType: "usage",
-              stockAfter: updatedItem.stock,
-              type: "consumption",
-            })
-            .run();
-        }
+      const usageId = writeUsage(context.db, context.user, {
+        backfillReason: input.backfillReason,
+        isBackfill: true,
+        items: input.items,
+        matterId: input.matterId,
+        movementNote: `补录：${input.backfillReason}`,
+        note: input.note ?? null,
+        operatorName: input.operatorName,
+        patientName: input.patientName,
+        patientNo: input.patientNo,
+        patientPhone: input.patientPhone ?? null,
+        patientType: input.patientType,
+        recordId: record?.id ?? null,
+        subWarehouseId,
+        usedAt: input.usedAt,
+        usedAtTime: input.usedTime,
       });
 
       const created = loadUsageRow(context.db, usageId);
 
       if (created === undefined) {
         throw new ORPCError("CONFLICT", {
-          message: "用物记录创建失败，请重试",
+          message: "补登记记录创建失败，请重试",
         });
       }
 
@@ -296,6 +455,7 @@ export const usageRouter = {
         .object({
           from: calendarDateSchema.optional(),
           matterId: z.string().min(1).optional(),
+          subWarehouseId: z.string().min(1).optional(),
           status: z.enum(["active", "revoke_pending", "revoked"]).optional(),
           teamId: z.string().min(1).optional(),
           to: calendarDateSchema.optional(),
@@ -328,6 +488,9 @@ export const usageRouter = {
         ...(input.matterId === undefined
           ? []
           : [eq(usageRecord.matterId, input.matterId)]),
+        ...(input.subWarehouseId === undefined
+          ? []
+          : [eq(usageRecord.subWarehouseId, input.subWarehouseId)]),
         ...(input.status === undefined
           ? []
           : [eq(usageRecord.status, input.status)]),
@@ -552,6 +715,7 @@ export const usageRouter = {
               itemId: line.itemId,
               matterId: usage.matterId,
               note: `撤销恢复：${input.note ?? request.reason}`,
+              subWarehouseId: updatedItem.subWarehouseId,
               operatorName: context.user.name,
               operatorUserId: context.user.id,
               quantityDelta: line.quantity,

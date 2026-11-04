@@ -1,6 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { MoreHorizontalIcon, PlusIcon } from "lucide-react";
+import {
+  ArrowLeftRightIcon,
+  MoreHorizontalIcon,
+  PlusIcon,
+  WarehouseIcon,
+} from "lucide-react";
 import { useState } from "react";
 
 import { Button } from "@handoverkit/ui/components/button";
@@ -37,6 +42,10 @@ import {
 } from "#src/features/admin/item-dialogs.tsx";
 import { useAdminTeamId } from "#src/features/admin/shared.ts";
 import type { ItemDto } from "#src/features/admin/shared.ts";
+import {
+  SubWarehouseManagerDialog,
+  TransferDialog,
+} from "#src/features/admin/sub-warehouse-dialog.tsx";
 import { api } from "#src/lib/api.ts";
 
 type StockDialogMode = "inbound" | "adjust";
@@ -171,6 +180,11 @@ const buildItemColumns = (
     key: "location",
   },
   {
+    cell: (item) => <span className="text-xs">{item.subWarehouseName}</span>,
+    header: "子仓库",
+    key: "subWarehouse",
+  },
+  {
     cell: (item) => <StatusBadge status={item.status} />,
     header: "状态",
     key: "status",
@@ -183,10 +197,18 @@ const buildItemColumns = (
   },
 ];
 
+// eslint-disable-next-line complexity
 const ItemsPageContent = () => {
   const teamId = useAdminTeamId();
   const [explicitMatterId, setExplicitMatterId] = useState<string | null>(null);
+
+  const [explicitSubWarehouseId, setExplicitSubWarehouseId] = useState<
+    string | null
+  >(null);
+
   const [includeArchived, setIncludeArchived] = useState(false);
+  const [warehouseManagerOpen, setWarehouseManagerOpen] = useState(false);
+  const [transferOpen, setTransferOpen] = useState(false);
 
   const mattersQuery = useQuery({
     ...api.matters.list.queryOptions({
@@ -203,11 +225,29 @@ const ItemsPageContent = () => {
     ? explicitMatterId
     : (matters[0]?.id ?? null);
 
-  const itemsQuery = useQuery({
-    ...api.items.list.queryOptions({
-      input: { includeArchived, matterId: selectedMatterId ?? "" },
+  const warehousesQuery = useQuery({
+    ...api.subWarehouses.list.queryOptions({
+      input: { matterId: selectedMatterId ?? "" },
     }),
     enabled: selectedMatterId !== null,
+  });
+
+  const warehouses = warehousesQuery.data ?? [];
+
+  const selectedSubWarehouseId = warehouses.some(
+    (warehouse) => warehouse.id === explicitSubWarehouseId
+  )
+    ? explicitSubWarehouseId
+    : (warehouses[0]?.id ?? null);
+
+  const itemsQuery = useQuery({
+    ...api.items.list.queryOptions({
+      input: {
+        includeArchived,
+        subWarehouseId: selectedSubWarehouseId ?? "",
+      },
+    }),
+    enabled: selectedSubWarehouseId !== null,
   });
 
   const [formOpen, setFormOpen] = useState(false);
@@ -252,17 +292,41 @@ const ItemsPageContent = () => {
     <div className="grid gap-6">
       <PageHeader
         actions={
-          <Button
-            disabled={selectedMatterId === null}
-            onClick={() => {
-              setEditingItem(null);
-              setFormOpen(true);
-            }}
-            size="sm"
-          >
-            <PlusIcon />
-            新建物品
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              disabled={selectedSubWarehouseId === null}
+              onClick={() => {
+                setEditingItem(null);
+                setFormOpen(true);
+              }}
+              size="sm"
+            >
+              <PlusIcon />
+              新建物品
+            </Button>
+            <Button
+              disabled={selectedMatterId === null}
+              onClick={() => {
+                setTransferOpen(true);
+              }}
+              size="sm"
+              variant="outline"
+            >
+              <ArrowLeftRightIcon />
+              物资调拨
+            </Button>
+            <Button
+              disabled={selectedMatterId === null}
+              onClick={() => {
+                setWarehouseManagerOpen(true);
+              }}
+              size="sm"
+              variant="outline"
+            >
+              <WarehouseIcon />
+              子仓库
+            </Button>
+          </div>
         }
         description={
           selectedMatter
@@ -288,6 +352,7 @@ const ItemsPageContent = () => {
               onValueChange={(next: string | null) => {
                 if (next !== null) {
                   setExplicitMatterId(next);
+                  setExplicitSubWarehouseId(null);
                 }
               }}
               value={selectedMatterId}
@@ -299,6 +364,39 @@ const ItemsPageContent = () => {
                 {matters.map((matter) => (
                   <SelectItem key={matter.id} value={matter.id}>
                     {matter.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </FormField>
+
+        <FormField
+          className="w-full sm:w-auto"
+          id="items-sub-warehouse"
+          label="子仓库"
+        >
+          {(field) => (
+            <Select
+              disabled={warehouses.length === 0}
+              items={warehouses.map((warehouse) => ({
+                label: warehouse.name,
+                value: warehouse.id,
+              }))}
+              onValueChange={(next: string | null) => {
+                if (next !== null) {
+                  setExplicitSubWarehouseId(next);
+                }
+              }}
+              value={selectedSubWarehouseId}
+            >
+              <SelectTrigger className="w-full sm:w-48" id={field.id}>
+                <SelectValue placeholder="选择子仓库" />
+              </SelectTrigger>
+              <SelectContent>
+                {warehouses.map((warehouse) => (
+                  <SelectItem key={warehouse.id} value={warehouse.id}>
+                    {warehouse.name}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -361,7 +459,7 @@ const ItemsPageContent = () => {
       {formOpen ? (
         <ItemFormDialog
           item={editingItem}
-          matterId={selectedMatterId}
+          subWarehouseId={selectedSubWarehouseId}
           onOpenChange={(next) => {
             setFormOpen(next);
 
@@ -416,6 +514,33 @@ const ItemsPageContent = () => {
           }}
         />
       )}
+
+      {warehouseManagerOpen && selectedMatterId !== null ? (
+        <SubWarehouseManagerDialog
+          matterId={selectedMatterId}
+          matterName={
+            matters.find((matter) => matter.id === selectedMatterId)?.name ?? ""
+          }
+          onOpenChange={(next) => {
+            setWarehouseManagerOpen(next);
+            void warehousesQuery.refetch();
+          }}
+        />
+      ) : null}
+
+      {transferOpen && selectedMatterId !== null ? (
+        <TransferDialog
+          defaultFromId={selectedSubWarehouseId}
+          matterId={selectedMatterId}
+          matterName={
+            matters.find((matter) => matter.id === selectedMatterId)?.name ?? ""
+          }
+          onOpenChange={(next) => {
+            setTransferOpen(next);
+            void itemsQuery.refetch();
+          }}
+        />
+      ) : null}
     </div>
   );
 };

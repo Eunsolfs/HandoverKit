@@ -100,9 +100,10 @@ const describeDiffItem = (item: RecordDetailDto["items"][number]): string => {
   return `${item.itemName}：应有 ${item.expectedQty} ${item.unit}，实盘 ${actualQty} ${item.unit}${item.note === null ? "" : `（${item.note}）`}`;
 };
 
-const buildDiffDescription = (record: RecordDetailDto): string => {
-  const items = diffItemsOf(record);
-
+const buildDiffDescription = (
+  record: RecordDetailDto,
+  items = diffItemsOf(record)
+): string => {
   if (items.length === 0) {
     return "";
   }
@@ -124,12 +125,21 @@ const handoverActualLine = (item: RecordDetailDto["items"][number]): string =>
     : `${item.handoverActualQty} ${item.unit}`;
 
 interface ExceptionReportFormProps {
+  actionLabel?: string;
+  defaultDescription?: string;
+  diffItems?: RecordDetailDto["items"];
   record: RecordDetailDto;
   onDone: () => void;
 }
 
-const ExceptionReportForm = ({ onDone, record }: ExceptionReportFormProps) => {
-  const diffItems = diffItemsOf(record);
+const ExceptionReportForm = ({
+  actionLabel = "登记用物消耗",
+  defaultDescription,
+  diffItems: customDiffItems,
+  onDone,
+  record,
+}: ExceptionReportFormProps) => {
+  const diffItems = customDiffItems ?? diffItemsOf(record);
 
   const [itemId, setItemId] = useState<string>(
     diffItems.length === 1 ? (diffItems[0]?.itemId ?? "all") : "all"
@@ -138,8 +148,8 @@ const ExceptionReportForm = ({ onDone, record }: ExceptionReportFormProps) => {
   const [type, setType] = useState<ExceptionTypeValue>("count_mismatch");
   const [severity, setSeverity] = useState<SeverityValue>("medium");
 
-  const [description, setDescription] = useState(() =>
-    buildDiffDescription(record)
+  const [description, setDescription] = useState(
+    () => defaultDescription ?? buildDiffDescription(record, diffItems)
   );
 
   const createMutation = useMutation({
@@ -159,7 +169,7 @@ const ExceptionReportForm = ({ onDone, record }: ExceptionReportFormProps) => {
         <ShieldAlertIcon />
         <AlertTitle>发现 {diffItems.length} 项数量差异</AlertTitle>
         <AlertDescription>
-          请先提交异常上报，之后才能登记用物消耗。
+          请先提交异常上报，之后才能{actionLabel}。
         </AlertDescription>
       </Alert>
 
@@ -434,6 +444,10 @@ const HandoverPanel = ({ onDone, onGoAccept, record }: HandoverPanelProps) => {
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
 
+  const [handoverDiffItems, setHandoverDiffItems] = useState<
+    RecordDetailDto["items"] | null
+  >(null);
+
   const handoverMutation = useMutation({
     ...api.records.submitHandover.mutationOptions(),
     onSuccess: () => {
@@ -441,6 +455,37 @@ const HandoverPanel = ({ onDone, onGoAccept, record }: HandoverPanelProps) => {
       onDone();
     },
   });
+
+  if (record.permissions.requiresExceptionReport) {
+    return (
+      <ExceptionReportForm
+        actionLabel="提交交班表"
+        onDone={onDone}
+        record={record}
+      />
+    );
+  }
+
+  if (handoverDiffItems !== null && record.exceptions.length === 0) {
+    const description = `交班核对发现数量差异：${handoverDiffItems
+      .map((item) => {
+        const line = lines.find((row) => row.itemId === item.itemId);
+        const actualQty = line?.actualQty ?? item.expectedQty;
+
+        return `${item.itemName}：应有 ${item.expectedQty} ${item.unit}，交班实盘 ${actualQty} ${item.unit}`;
+      })
+      .join("；")}`;
+
+    return (
+      <ExceptionReportForm
+        actionLabel="提交交班表"
+        defaultDescription={description}
+        diffItems={handoverDiffItems}
+        onDone={onDone}
+        record={record}
+      />
+    );
+  }
 
   if (!record.permissions.canHandover) {
     const hint = STATUS_HINTS[record.status];
@@ -488,15 +533,6 @@ const HandoverPanel = ({ onDone, onGoAccept, record }: HandoverPanelProps) => {
 
   return (
     <div className="grid gap-3">
-      {record.permissions.requiresExceptionReport ? (
-        <Alert>
-          <ShieldAlertIcon />
-          <AlertTitle>存在数量差异，尚未异常上报</AlertTitle>
-          <AlertDescription>
-            交班表仍可提交，但建议先用物登记页完成异常上报，便于管理员跟进。
-          </AlertDescription>
-        </Alert>
-      ) : null}
       <p className="text-muted-foreground text-xs">
         交班前请再次核对清单；实盘与应有数量不一致时必须填写备注。
       </p>
@@ -530,6 +566,23 @@ const HandoverPanel = ({ onDone, onGoAccept, record }: HandoverPanelProps) => {
 
             if (message !== null) {
               setError(message);
+
+              return;
+            }
+
+            const mismatchItems = record.items.filter((item) => {
+              const line = lines.find((row) => row.itemId === item.itemId);
+
+              return (
+                line?.actualQty !== null &&
+                line?.actualQty !== undefined &&
+                line.actualQty !== item.expectedQty
+              );
+            });
+
+            if (mismatchItems.length > 0 && record.exceptions.length === 0) {
+              setError(null);
+              setHandoverDiffItems(mismatchItems);
 
               return;
             }
@@ -592,6 +645,18 @@ const UsagePanel = ({
     );
   }
 
+  if (record.status === "handover_submitted") {
+    return (
+      <Alert>
+        <ShieldAlertIcon />
+        <AlertTitle>今日已交班，普通用物登记已关闭</AlertTitle>
+        <AlertDescription>
+          补录历史消耗请前往「用物消耗」页使用「补登记」。
+        </AlertDescription>
+      </Alert>
+    );
+  }
+
   if (record.permissions.requiresExceptionReport) {
     return <ExceptionReportForm onDone={onDone} record={record} />;
   }
@@ -622,7 +687,11 @@ const UsagePanel = ({
       defaultOperatorName={operatorName}
       items={data.items}
       onSubmit={(value: UsageEntryValue) => {
-        createMutation.mutate({ matterId: data.matter.id, ...value });
+        createMutation.mutate({
+          matterId: data.matter.id,
+          subWarehouseId: data.today.subWarehouseId,
+          ...value,
+        });
       }}
       pending={createMutation.isPending}
       submitLabel="提交用物登记"
@@ -635,17 +704,18 @@ const ScanPage = () => {
   const me = useMe();
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<ScanTab>(TAB_ACCEPT);
+  const [subWarehouseId, setSubWarehouseId] = useState<string | undefined>();
 
   // 二维码无效/事项归档属于 4xx，不应重试，避免长时间骨架屏后才显示错误
   const scanQuery = useQuery({
-    ...api.matters.byToken.queryOptions({ input: { token } }),
+    ...api.matters.byToken.queryOptions({
+      input: { subWarehouseId, token },
+    }),
     retry: false,
   });
 
   const refresh = () => {
-    void queryClient.invalidateQueries({
-      queryKey: api.matters.byToken.queryKey({ input: { token } }),
-    });
+    void queryClient.invalidateQueries();
   };
 
   const goUsageAfterAccept = () => {
@@ -694,14 +764,45 @@ const ScanPage = () => {
           <AppBrand />
           <StatusBadge status={today.status} />
         </div>
-        <div className="mt-3 space-y-0.5">
+        <div className="mt-3 space-y-1">
           <h1 className="text-lg font-semibold tracking-tight break-words">
             {data.matter.name}
           </h1>
           <p className="text-muted-foreground text-xs">
             {data.team.name} · {formatRecordDate(today.recordDate)} ·{" "}
-            {data.items.length} 种物品
+            {today.items.length} 种物品
           </p>
+          {data.subWarehouses.length > 1 ? (
+            <Select
+              items={data.subWarehouses.map((warehouse) => ({
+                label: warehouse.name,
+                value: warehouse.id,
+              }))}
+              onValueChange={(value) => {
+                setSubWarehouseId(value ?? undefined);
+              }}
+              value={data.selectedSubWarehouseId}
+            >
+              <SelectTrigger
+                aria-label="选择子仓库"
+                className="h-8 w-full"
+                size="sm"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {data.subWarehouses.map((warehouse) => (
+                  <SelectItem key={warehouse.id} value={warehouse.id}>
+                    {warehouse.name}（{warehouse.itemCount} 种）
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <p className="text-muted-foreground text-xs">
+              子仓库：{data.subWarehouses[0]?.name ?? "未配置"}
+            </p>
+          )}
         </div>
       </header>
 

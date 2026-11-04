@@ -78,8 +78,8 @@ interface ItemFormDialogProps {
   onOpenChange: (open: boolean) => void;
   /** null 表示新建物品。 */
   item: ItemDto | null;
-  /** 新建物品所属的交接事项。 */
-  matterId: string | null;
+  /** 新建物品所属的子仓库。 */
+  subWarehouseId: string | null;
 }
 
 interface ItemFormDefaults {
@@ -104,8 +104,8 @@ const buildItemFormDefaults = (item: ItemDto | null): ItemFormDefaults => ({
 
 export const ItemFormDialog = ({
   item,
-  matterId,
   onOpenChange,
+  subWarehouseId,
 }: ItemFormDialogProps) => {
   const queryClient = useQueryClient();
   const defaults = buildItemFormDefaults(item);
@@ -176,8 +176,8 @@ export const ItemFormDialog = ({
     const minStockValue = toWholeNumber(minStock, 0);
 
     if (item === null) {
-      if (matterId === null) {
-        setErrors({ form: "请先选择交接事项" });
+      if (subWarehouseId === null) {
+        setErrors({ form: "请先选择子仓库" });
 
         return;
       }
@@ -185,12 +185,12 @@ export const ItemFormDialog = ({
       createItem.mutate({
         category: optionalText(category),
         location: optionalText(location),
-        matterId,
         minStock: minStockValue,
         name: name.trim(),
         note: optionalText(note),
         spec: optionalText(spec),
         stock: toWholeNumber(stock, 0),
+        subWarehouseId,
         unit: unit.trim(),
       });
 
@@ -602,6 +602,8 @@ const MOVEMENT_TYPE_LABELS: Record<StockMovementDto["type"], string> = {
   adjustment: "盘点调整",
   consumption: "消耗",
   inbound: "入库",
+  transfer_in: "调拨入库",
+  transfer_out: "调拨出库",
   initial: "初始",
   revoke: "撤销恢复",
 };
@@ -613,6 +615,8 @@ const MOVEMENT_TONE: Record<
   adjustment: "warning",
   consumption: "danger",
   inbound: "success",
+  transfer_in: "success",
+  transfer_out: "warning",
   initial: "progress",
   revoke: "neutral",
 };

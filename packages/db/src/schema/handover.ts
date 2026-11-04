@@ -31,6 +31,7 @@ const id = () =>
 export const ROLE_VALUES = ["super_admin", "team_admin", "member"] as const;
 export const TEAM_STATUS_VALUES = ["active", "archived"] as const;
 export const MATTER_STATUS_VALUES = ["active", "archived"] as const;
+export const SUB_WAREHOUSE_STATUS_VALUES = ["active", "archived"] as const;
 export const ITEM_STATUS_VALUES = ["active", "archived"] as const;
 export const USER_STATUS_VALUES = ["active", "disabled"] as const;
 
@@ -52,6 +53,8 @@ export const MOVEMENT_TYPE_VALUES = [
   "consumption",
   "revoke",
   "adjustment",
+  "transfer_in",
+  "transfer_out",
 ] as const;
 
 export const EXCEPTION_TYPE_VALUES = [
@@ -128,7 +131,40 @@ export const matter = snakeCase.table(
   ]
 );
 
-/** 物品（仓库目录），stock 为当前库存，由流水驱动。 */
+/** 子仓库：同一交接事项下按使用地点划分的物理库存。 */
+export const subWarehouse = snakeCase.table(
+  "sub_warehouse",
+  {
+    id: id(),
+    matterId: text()
+      .notNull()
+      .references(() => matter.id, { onDelete: "cascade" }),
+    name: text().notNull(),
+    code: text(),
+    location: text(),
+    description: text(),
+    status: text().notNull().default("active"),
+    sortOrder: integer().notNull().default(0),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("sub_warehouse_matter_name_unique").on(
+      table.matterId,
+      table.name
+    ),
+    index("sub_warehouse_matter_status_idx").on(table.matterId, table.status),
+    check(
+      "sub_warehouse_status_check",
+      inList(table.status, SUB_WAREHOUSE_STATUS_VALUES)
+    ),
+    check(
+      "sub_warehouse_name_length",
+      sql`length(trim(${table.name})) between 1 and 60`
+    ),
+  ]
+);
+
+/** 物品（子仓库库存行），stock 为当前子仓库库存，由流水驱动。 */
 export const item = snakeCase.table(
   "item",
   {
@@ -136,6 +172,9 @@ export const item = snakeCase.table(
     matterId: text()
       .notNull()
       .references(() => matter.id, { onDelete: "cascade" }),
+    subWarehouseId: text()
+      .notNull()
+      .references(() => subWarehouse.id, { onDelete: "cascade" }),
     name: text().notNull(),
     spec: text(),
     unit: text().notNull(),
@@ -148,8 +187,15 @@ export const item = snakeCase.table(
     ...timestamps,
   },
   (table) => [
-    uniqueIndex("item_matter_name_unique").on(table.matterId, table.name),
+    uniqueIndex("item_sub_warehouse_name_unique").on(
+      table.subWarehouseId,
+      table.name
+    ),
     index("item_matter_status_idx").on(table.matterId, table.status),
+    index("item_sub_warehouse_status_idx").on(
+      table.subWarehouseId,
+      table.status
+    ),
     check("item_status_check", inList(table.status, ITEM_STATUS_VALUES)),
     check("item_stock_non_negative", sql`${table.stock} >= 0`),
     check("item_min_stock_non_negative", sql`${table.minStock} >= 0`),
@@ -172,6 +218,9 @@ export const stockMovement = snakeCase.table(
     matterId: text()
       .notNull()
       .references(() => matter.id, { onDelete: "cascade" }),
+    subWarehouseId: text()
+      .notNull()
+      .references(() => subWarehouse.id, { onDelete: "cascade" }),
     itemId: text()
       .notNull()
       .references(() => item.id, { onDelete: "cascade" }),
@@ -189,6 +238,10 @@ export const stockMovement = snakeCase.table(
     index("stock_movement_item_created_idx").on(table.itemId, table.createdAt),
     index("stock_movement_matter_created_idx").on(
       table.matterId,
+      table.createdAt
+    ),
+    index("stock_movement_sub_warehouse_created_idx").on(
+      table.subWarehouseId,
       table.createdAt
     ),
     check(
@@ -210,6 +263,9 @@ export const handoverRecord = snakeCase.table(
     matterId: text()
       .notNull()
       .references(() => matter.id, { onDelete: "cascade" }),
+    subWarehouseId: text()
+      .notNull()
+      .references(() => subWarehouse.id, { onDelete: "cascade" }),
     recordDate: text().notNull(),
     status: text().notNull().default("pending_acceptance"),
     acceptedByUserId: text(),
@@ -223,12 +279,16 @@ export const handoverRecord = snakeCase.table(
     ...timestamps,
   },
   (table) => [
-    uniqueIndex("handover_record_matter_date_unique").on(
-      table.matterId,
+    uniqueIndex("handover_record_sub_warehouse_date_unique").on(
+      table.subWarehouseId,
       table.recordDate
     ),
     index("handover_record_matter_created_idx").on(
       table.matterId,
+      table.createdAt
+    ),
+    index("handover_record_sub_warehouse_created_idx").on(
+      table.subWarehouseId,
       table.createdAt
     ),
     index("handover_record_status_idx").on(table.status),
@@ -291,10 +351,18 @@ export const usageRecord = snakeCase.table(
     matterId: text()
       .notNull()
       .references(() => matter.id, { onDelete: "cascade" }),
+    subWarehouseId: text()
+      .notNull()
+      .references(() => subWarehouse.id, { onDelete: "restrict" }),
     recordId: text().references(() => handoverRecord.id, {
       onDelete: "set null",
     }),
     usedAt: text().notNull(),
+    /** 补录时的具体使用时间（HH:mm，24 小时制）；普通登记为空，由 createdAt 体现。 */
+    usedAtTime: text(),
+    /** 是否为补登记记录（补录不受接班门禁限制，但必须填写原因）。 */
+    isBackfill: integer({ mode: "boolean" }).notNull().default(false),
+    backfillReason: text(),
     patientName: text().notNull(),
     patientType: text().notNull(),
     patientNo: text().notNull(),
@@ -308,6 +376,10 @@ export const usageRecord = snakeCase.table(
   },
   (table) => [
     index("usage_record_matter_used_at_idx").on(table.matterId, table.usedAt),
+    index("usage_record_sub_warehouse_used_at_idx").on(
+      table.subWarehouseId,
+      table.usedAt
+    ),
     index("usage_record_record_idx").on(table.recordId),
     index("usage_record_status_idx").on(table.status),
     check(
@@ -321,6 +393,14 @@ export const usageRecord = snakeCase.table(
     check(
       "usage_record_date_format",
       sql`length(${table.usedAt}) = 10 and ${table.usedAt} glob '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'`
+    ),
+    check(
+      "usage_record_time_format",
+      sql`${table.usedAtTime} is null or ${table.usedAtTime} glob '[0-2][0-9]:[0-5][0-9]'`
+    ),
+    check(
+      "usage_record_backfill_reason",
+      sql`${table.isBackfill} = 0 or (${table.backfillReason} is not null and length(trim(${table.backfillReason})) between 2 and 300)`
     ),
   ]
 );
@@ -344,6 +424,56 @@ export const usageItem = snakeCase.table(
     index("usage_item_usage_idx").on(table.usageId),
     index("usage_item_item_idx").on(table.itemId),
     check("usage_item_quantity_positive", sql`${table.quantity} > 0`),
+  ]
+);
+
+/** 子仓库调拨：同一事项下从一个子仓库调拨到另一个子仓库。 */
+export const stockTransfer = snakeCase.table(
+  "stock_transfer",
+  {
+    id: id(),
+    matterId: text()
+      .notNull()
+      .references(() => matter.id, { onDelete: "cascade" }),
+    fromSubWarehouseId: text()
+      .notNull()
+      .references(() => subWarehouse.id, { onDelete: "restrict" }),
+    toSubWarehouseId: text()
+      .notNull()
+      .references(() => subWarehouse.id, { onDelete: "restrict" }),
+    sourceItemId: text()
+      .notNull()
+      .references(() => item.id, { onDelete: "restrict" }),
+    targetItemId: text()
+      .notNull()
+      .references(() => item.id, { onDelete: "restrict" }),
+    itemName: text().notNull(),
+    itemSpec: text(),
+    unit: text().notNull(),
+    quantity: integer().notNull(),
+    operatorUserId: text().notNull(),
+    operatorName: text().notNull(),
+    note: text(),
+    createdAt: timestamp().notNull().default(now),
+  },
+  (table) => [
+    index("stock_transfer_matter_created_idx").on(
+      table.matterId,
+      table.createdAt
+    ),
+    index("stock_transfer_from_created_idx").on(
+      table.fromSubWarehouseId,
+      table.createdAt
+    ),
+    index("stock_transfer_to_created_idx").on(
+      table.toSubWarehouseId,
+      table.createdAt
+    ),
+    check("stock_transfer_quantity_positive", sql`${table.quantity} > 0`),
+    check(
+      "stock_transfer_warehouses_differ",
+      sql`${table.fromSubWarehouseId} <> ${table.toSubWarehouseId}`
+    ),
   ]
 );
 

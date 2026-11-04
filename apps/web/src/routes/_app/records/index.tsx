@@ -46,7 +46,14 @@ const COLUMNS: DataTableColumn<RecordSummaryDto>[] = [
     key: "date",
   },
   {
-    cell: (record) => record.matterName,
+    cell: (record) => (
+      <div className="grid gap-0.5">
+        <span>{record.matterName}</span>
+        <span className="text-muted-foreground text-xs">
+          {record.subWarehouseName}
+        </span>
+      </div>
+    ),
     header: "交接事项",
     key: "matter",
   },

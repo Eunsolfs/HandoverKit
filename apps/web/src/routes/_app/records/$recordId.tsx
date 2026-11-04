@@ -237,7 +237,7 @@ const RecordDetailPage = () => {
               ) : null}
             </>
           }
-          description={`${record.matterName} · ${formatRecordDate(record.recordDate)} · 清单 ${record.itemCount} 项 · 差异 ${record.diffCount} 项`}
+          description={`${record.matterName} · ${record.subWarehouseName} · ${formatRecordDate(record.recordDate)} · 清单 ${record.itemCount} 项 · 差异 ${record.diffCount} 项`}
           title="交接记录详情"
         />
       </div>

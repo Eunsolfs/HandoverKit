@@ -1,18 +1,21 @@
 import { ORPCError } from "@orpc/server";
-import { and, count, desc, eq, gte, lte } from "drizzle-orm";
+import { and, count, desc, eq, gte, lte, ne } from "drizzle-orm";
 import { z } from "zod";
 
 import type { Database } from "@handoverkit/db";
 import {
+  exceptionEvent,
   handoverRecord,
   handoverRecordItem,
   matter,
+  subWarehouse,
   usageRecord,
 } from "@handoverkit/db/schema/handover";
 
 import {
   assertMatterAccess,
   assertMatterActive,
+  assertSubWarehouseAccess,
   resolveTeamId,
 } from "#src/authz.ts";
 import type { Profile } from "#src/context.ts";
@@ -149,6 +152,48 @@ const loadChecklist = (db: Database, recordId: string): RecordItemRow[] =>
 const statusConflict = (message: string) =>
   new ORPCError("CONFLICT", { message });
 
+const resolveSubWarehouseId = async (
+  db: Database,
+  profile: Profile,
+  matterId: string,
+  subWarehouseId?: string
+): Promise<string> => {
+  if (subWarehouseId !== undefined) {
+    const access = await assertSubWarehouseAccess(db, profile, subWarehouseId);
+
+    if (access.matterId !== matterId) {
+      throw new ORPCError("BAD_REQUEST", {
+        message: "子仓库不属于该交接事项",
+      });
+    }
+
+    if (access.status !== "active") {
+      throw new ORPCError("CONFLICT", { message: "子仓库已停用" });
+    }
+
+    return access.id;
+  }
+
+  const [first] = db
+    .select({ id: subWarehouse.id })
+    .from(subWarehouse)
+    .where(
+      and(
+        eq(subWarehouse.matterId, matterId),
+        eq(subWarehouse.status, "active")
+      )
+    )
+    .orderBy(subWarehouse.sortOrder, subWarehouse.createdAt)
+    .limit(1)
+    .all();
+
+  if (first === undefined) {
+    throw new ORPCError("NOT_FOUND", { message: "该事项还没有可用子仓库" });
+  }
+
+  return first.id;
+};
+
 export const recordsRouter = {
   accept: protectedProcedure
     .input(
@@ -238,6 +283,7 @@ export const recordsRouter = {
           anchorDate: calendarDateSchema.optional(),
           matterId: z.string().min(1).optional(),
           period: z.enum(["day", "week", "month", "year"]).optional(),
+          subWarehouseId: z.string().min(1).optional(),
           status: z
             .enum(["pending_acceptance", "accepted", "handover_submitted"])
             .optional(),
@@ -276,6 +322,9 @@ export const recordsRouter = {
         ...(input.matterId === undefined
           ? []
           : [eq(handoverRecord.matterId, input.matterId)]),
+        ...(input.subWarehouseId === undefined
+          ? []
+          : [eq(handoverRecord.subWarehouseId, input.subWarehouseId)]),
         ...(input.status === undefined
           ? []
           : [eq(handoverRecord.status, input.status)]),
@@ -337,6 +386,7 @@ export const recordsRouter = {
           .where(
             and(
               eq(usageRecord.matterId, row.matterId),
+              eq(usageRecord.subWarehouseId, row.subWarehouseId),
               eq(usageRecord.usedAt, row.recordDate)
             )
           )
@@ -379,8 +429,49 @@ export const recordsRouter = {
         throw statusConflict("当前记录不是已接收状态，不能提交交班表");
       }
 
+      const acceptanceDiffItems = context.db
+        .select({ id: handoverRecordItem.id })
+        .from(handoverRecordItem)
+        .where(
+          and(
+            eq(handoverRecordItem.recordId, row.id),
+            ne(handoverRecordItem.actualQty, handoverRecordItem.expectedQty)
+          )
+        )
+        .all();
+
       const recordItems = loadChecklist(context.db, row.id);
       const lines = resolveChecklist(recordItems, input.items);
+
+      const expectedById = new Map(
+        recordItems.map((itemRow) => [itemRow.id, itemRow.expectedQty])
+      );
+
+      const handoverDiffCount = lines.filter(
+        (line) =>
+          line.actualQty !== null &&
+          line.actualQty !== expectedById.get(line.row.id)
+      ).length;
+
+      if (acceptanceDiffItems.length > 0 || handoverDiffCount > 0) {
+        const [reported] = context.db
+          .select({ id: exceptionEvent.id })
+          .from(exceptionEvent)
+          .where(eq(exceptionEvent.recordId, row.id))
+          .all();
+
+        if (reported === undefined) {
+          const diffCount = Math.max(
+            acceptanceDiffItems.length,
+            handoverDiffCount
+          );
+
+          throw statusConflict(
+            `接班/交班核对发现 ${diffCount} 项数量差异，请先提交异常上报后再交班`
+          );
+        }
+      }
+
       const now = new Date();
       const operatorName = context.user.name;
 
@@ -428,6 +519,7 @@ export const recordsRouter = {
       z.object({
         date: calendarDateSchema.optional(),
         matterId: z.string().min(1),
+        subWarehouseId: z.string().min(1).optional(),
       })
     )
     .handler(async ({ context, input }) => {
@@ -439,12 +531,24 @@ export const recordsRouter = {
 
       assertMatterActive(access);
 
+      const subWarehouseId = await resolveSubWarehouseId(
+        context.db,
+        context.user,
+        input.matterId,
+        input.subWarehouseId
+      );
+
       const teamRow = loadTeamRow(context.db, access.teamId);
 
       const recordDate =
         input.date ?? todayInTimeZone(teamRow?.timezone ?? "Asia/Shanghai");
 
-      const record = ensureRecord(context.db, input.matterId, recordDate);
+      const record = ensureRecord(
+        context.db,
+        input.matterId,
+        subWarehouseId,
+        recordDate
+      );
 
       return loadRecordDetail(context.db, context.user, record);
     }),

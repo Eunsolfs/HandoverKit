@@ -153,3 +153,8 @@
 - 现象：本机 Docker Desktop 在某次网络切换后无法解析/连接 ghcr.io（`lookup ghcr.io: no such host` / 连接超时），而 GitHub、npm 正常；Dockerfile 的构建基础镜像在 ghcr.io，导致 `docker build` 失败。
 - 处理：本地验证可复用已有运行镜像，把宿主机 `vp run -r build` 产出的 `apps/server/dist` 与 `apps/web/dist` 复制进临时容器后 `docker commit` 成新 tag，再 `compose up -d --force-recreate app`（仅用于本地复测，不替代正式构建）。正式镜像由 GitHub Actions 构建，CI 网络可访问 GHCR。
 - 另：Dockerfile 顶部 `# syntax=docker/dockerfile:1` 会让 BuildKit 额外拉取 docker.io 前端镜像；本地网络受限时已移除该行（标准 Dockerfile 语法不需要它）。
+
+### 24. 本地热更新镜像残留旧迁移导致 migrate 失败
+
+- 现象：把本机 `apps/server/dist` 复制进旧镜像做热更新时，`dist/migrations` 可能同时保留旧版与新版迁移目录；演示库只记录新版迁移，`migrate` 会先执行旧迁移并报 `table already exists`。
+- 处理：复制前清理 `apps/server/dist/migrations` 下的旧目录，或构建只含当前迁移的干净镜像；全新数据卷可用 `docker compose down -v` 后重新迁移验证。正式 Docker 构建从干净上下文复制迁移，不会带入宿主机 `dist`。

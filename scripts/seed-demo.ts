@@ -30,6 +30,7 @@ import {
   matter,
   revokeRequest,
   stockMovement,
+  subWarehouse,
   team,
   usageItem,
   usageRecord,
@@ -389,8 +390,32 @@ const initialAt = timestampAt(shiftDays(today, -3), "09:00");
 const itemId = (matterKey: string, itemKey: string): string =>
   `demo-item-${matterKey}-${itemKey}`;
 
-const recordId = (matterKey: string, date: string): string =>
-  `demo-record-${matterKey}-${date}`;
+const demoWarehouses = [
+  { key: "outpatient", name: "门诊仓库" },
+  { key: "inpatient", name: "住院仓库" },
+] as const;
+
+type DemoWarehouseKey = (typeof demoWarehouses)[number]["key"];
+
+const subWarehouseId = (
+  matterKey: string,
+  warehouseKey: DemoWarehouseKey
+): string => `demo-sub-${matterKey}-${warehouseKey}`;
+
+const warehouseKeyForItem = (
+  matterSeed: DemoMatterSeed,
+  itemKey: string
+): DemoWarehouseKey => {
+  const index = matterSeed.items.findIndex((row) => row.key === itemKey);
+
+  return demoWarehouses[index % 2]?.key ?? "outpatient";
+};
+
+const recordId = (
+  matterKey: string,
+  date: string,
+  warehouseKey: DemoWarehouseKey
+): string => `demo-record-${matterKey}-${warehouseKey}-${date}`;
 
 const findOrCreateTeam = (): string => {
   const [byCode] = db
@@ -634,6 +659,20 @@ const insertDemoMatters = (tx: Transaction, context: SeedContext) => {
       })
       .run();
 
+    for (const [index, warehouse] of demoWarehouses.entries()) {
+      tx.insert(subWarehouse)
+        .values({
+          createdAt: initialAt,
+          id: subWarehouseId(matterSeed.key, warehouse.key),
+          matterId: matterSeed.id,
+          name: warehouse.name,
+          sortOrder: index,
+          status: "active",
+          updatedAt: initialAt,
+        })
+        .run();
+    }
+
     for (const itemSeed of matterSeed.items) {
       tx.insert(item)
         .values({
@@ -647,6 +686,10 @@ const insertDemoMatters = (tx: Transaction, context: SeedContext) => {
           spec: itemSeed.spec,
           status: "active",
           stock: finalStock(matterSeed, itemSeed.key),
+          subWarehouseId: subWarehouseId(
+            matterSeed.key,
+            warehouseKeyForItem(matterSeed, itemSeed.key)
+          ),
           unit: itemSeed.unit,
           updatedAt: initialAt,
         })
@@ -664,6 +707,10 @@ const insertDemoMatters = (tx: Transaction, context: SeedContext) => {
           quantityDelta: itemSeed.stock,
           refType: "manual",
           stockAfter: itemSeed.stock,
+          subWarehouseId: subWarehouseId(
+            matterSeed.key,
+            warehouseKeyForItem(matterSeed, itemSeed.key)
+          ),
           type: "initial",
         })
         .run();
@@ -675,65 +722,79 @@ const insertDemoRecords = (tx: Transaction, context: SeedContext) => {
   for (const matterSeed of demoMatters) {
     for (const dayOffset of HISTORY_OFFSETS) {
       const date = shiftDays(today, dayOffset);
-      const id = recordId(matterSeed.key, date);
-      const acceptedAt = timestampAt(date, "08:10");
-      const handoverAt = timestampAt(date, "19:50");
       const consumed = consumptionBefore(matterSeed.key, dayOffset);
       const isEmergency = matterSeed.key === "emergency";
 
-      tx.insert(handoverRecord)
-        .values({
-          acceptedAt,
-          acceptedByName: context.operators.nurse.name,
-          acceptedByUserId: context.operators.nurse.id,
-          acceptanceNote: isEmergency
-            ? "夜班交接：处置室物品按清单核对，纱布差异已上报。"
-            : "晨间交接：治疗室物品按清单核对无差异。",
-          createdAt: timestampAt(date, "07:55"),
-          handoverAt,
-          handoverByName: context.operators.teamadmin.name,
-          handoverByUserId: context.operators.teamadmin.id,
-          handoverNote: isEmergency
-            ? "白班结束，交接表已提交，纱布差异待管理员处置。"
-            : "治疗室交接表已提交，耗材补充已登记。",
-          id,
-          matterId: matterSeed.id,
-          recordDate: date,
-          status: "handover_submitted",
-          updatedAt: handoverAt,
-        })
-        .run();
+      for (const warehouse of demoWarehouses) {
+        const warehouseItems = matterSeed.items.filter(
+          (itemSeed) =>
+            warehouseKeyForItem(matterSeed, itemSeed.key) === warehouse.key
+        );
 
-      for (const itemSeed of matterSeed.items) {
-        const expectedQty = itemSeed.stock - (consumed.get(itemSeed.key) ?? 0);
+        if (warehouseItems.length === 0) {
+          continue;
+        }
 
-        const isDiff =
-          isEmergency && dayOffset === -1 && itemSeed.key === DIFF_ITEM_KEY;
+        const id = recordId(matterSeed.key, date, warehouse.key);
+        const acceptedAt = timestampAt(date, "08:10");
+        const handoverAt = timestampAt(date, "19:50");
 
-        const actualQty = isDiff ? expectedQty - 2 : expectedQty;
-
-        const note = isDiff
-          ? `实盘 ${actualQty} ${itemSeed.unit}，比应有少 2 ${itemSeed.unit}，已上报异常。`
-          : null;
-
-        tx.insert(handoverRecordItem)
+        tx.insert(handoverRecord)
           .values({
             acceptedAt,
-            actualQty,
-            checked: true,
-            expectedQty,
-            handoverActualQty: actualQty,
-            handoverChecked: true,
-            handoverNote: note,
-            id: `${id}-${itemSeed.key}`,
-            itemId: itemId(matterSeed.key, itemSeed.key),
-            itemName: itemSeed.name,
-            itemSpec: itemSeed.spec,
-            note,
-            recordId: id,
-            unit: itemSeed.unit,
+            acceptedByName: context.operators.nurse.name,
+            acceptedByUserId: context.operators.nurse.id,
+            acceptanceNote: isEmergency
+              ? "夜班交接：处置室物品按清单核对，纱布差异已上报。"
+              : "晨间交接：治疗室物品按清单核对无差异。",
+            createdAt: timestampAt(date, "07:55"),
+            handoverAt,
+            handoverByName: context.operators.teamadmin.name,
+            handoverByUserId: context.operators.teamadmin.id,
+            handoverNote: isEmergency
+              ? "白班结束，交接表已提交，纱布差异待管理员处置。"
+              : "治疗室交接表已提交，耗材补充已登记。",
+            id,
+            matterId: matterSeed.id,
+            recordDate: date,
+            status: "handover_submitted",
+            subWarehouseId: subWarehouseId(matterSeed.key, warehouse.key),
+            updatedAt: handoverAt,
           })
           .run();
+
+        for (const itemSeed of warehouseItems) {
+          const expectedQty =
+            itemSeed.stock - (consumed.get(itemSeed.key) ?? 0);
+
+          const isDiff =
+            isEmergency && dayOffset === -1 && itemSeed.key === DIFF_ITEM_KEY;
+
+          const actualQty = isDiff ? expectedQty - 2 : expectedQty;
+
+          const note = isDiff
+            ? `实盘 ${actualQty} ${itemSeed.unit}，比应有少 2 ${itemSeed.unit}，已上报异常。`
+            : null;
+
+          tx.insert(handoverRecordItem)
+            .values({
+              acceptedAt,
+              actualQty,
+              checked: true,
+              expectedQty,
+              handoverActualQty: actualQty,
+              handoverChecked: true,
+              handoverNote: note,
+              id: `${id}-${itemSeed.key}`,
+              itemId: itemId(matterSeed.key, itemSeed.key),
+              itemName: itemSeed.name,
+              itemSpec: itemSeed.spec,
+              note,
+              recordId: id,
+              unit: itemSeed.unit,
+            })
+            .run();
+        }
       }
     }
   }
@@ -765,9 +826,17 @@ const insertDemoUsages = (
 
     const operator = context.operators[usage.operator];
 
+    const [firstLine] = usage.lines;
+
+    const usageWarehouse =
+      firstLine === undefined
+        ? null
+        : warehouseKeyForItem(matterSeed, firstLine.itemKey);
+
     const linkedRecord =
-      usage.dayOffset === -1 || usage.dayOffset === -2
-        ? recordId(matterSeed.key, date)
+      usageWarehouse !== null &&
+      (usage.dayOffset === -1 || usage.dayOffset === -2)
+        ? recordId(matterSeed.key, date, usageWarehouse)
         : null;
 
     tx.insert(usageRecord)
@@ -784,6 +853,10 @@ const insertDemoUsages = (
         patientType: usage.patientType,
         recordId: linkedRecord,
         status: usage.status,
+        subWarehouseId:
+          usageWarehouse === null
+            ? subWarehouseId(usage.matterKey, "outpatient")
+            : subWarehouseId(usage.matterKey, usageWarehouse),
         updatedAt: createdAt,
         usedAt: date,
       })
@@ -857,6 +930,10 @@ const insertDemoMovements = (
             refId: usage.id,
             refType: "usage",
             stockAfter: nextStock,
+            subWarehouseId: subWarehouseId(
+              matterSeed.key,
+              warehouseKeyForItem(matterSeed, line.itemKey)
+            ),
             type: "consumption",
           })
           .run();
@@ -908,7 +985,11 @@ const insertDemoAlerts = (tx: Transaction, context: SeedContext) => {
       id: "demo-exception-01",
       itemId: itemId("emergency", DIFF_ITEM_KEY),
       matterId: emergencyMatter.id,
-      recordId: recordId("emergency", exceptionDate),
+      recordId: recordId(
+        "emergency",
+        exceptionDate,
+        warehouseKeyForItem(emergencyMatter, DIFF_ITEM_KEY)
+      ),
       reportedByName: context.operators.nurse.name,
       reportedByUserId: context.operators.nurse.id,
       severity: "medium",

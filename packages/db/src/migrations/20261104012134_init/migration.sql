@@ -84,6 +84,7 @@ CREATE TABLE `exception_event` (
 CREATE TABLE `handover_record` (
 	`id` text PRIMARY KEY,
 	`matter_id` text NOT NULL,
+	`sub_warehouse_id` text NOT NULL,
 	`record_date` text NOT NULL,
 	`status` text DEFAULT 'pending_acceptance' NOT NULL,
 	`accepted_by_user_id` text,
@@ -97,6 +98,7 @@ CREATE TABLE `handover_record` (
 	`created_at` integer DEFAULT (cast(unixepoch('subsec') * 1000 as integer)) NOT NULL,
 	`updated_at` integer DEFAULT (cast(unixepoch('subsec') * 1000 as integer)) NOT NULL,
 	CONSTRAINT `fk_handover_record_matter_id_matter_id_fk` FOREIGN KEY (`matter_id`) REFERENCES `matter`(`id`) ON DELETE CASCADE,
+	CONSTRAINT `fk_handover_record_sub_warehouse_id_sub_warehouse_id_fk` FOREIGN KEY (`sub_warehouse_id`) REFERENCES `sub_warehouse`(`id`) ON DELETE CASCADE,
 	CONSTRAINT "handover_record_status_check" CHECK("status" in ('pending_acceptance', 'accepted', 'handover_submitted')),
 	CONSTRAINT "handover_record_date_format" CHECK(length("record_date") = 10 and "record_date" glob '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]')
 );
@@ -125,6 +127,7 @@ CREATE TABLE `handover_record_item` (
 CREATE TABLE `item` (
 	`id` text PRIMARY KEY,
 	`matter_id` text NOT NULL,
+	`sub_warehouse_id` text NOT NULL,
 	`name` text NOT NULL,
 	`spec` text,
 	`unit` text NOT NULL,
@@ -137,6 +140,7 @@ CREATE TABLE `item` (
 	`created_at` integer DEFAULT (cast(unixepoch('subsec') * 1000 as integer)) NOT NULL,
 	`updated_at` integer DEFAULT (cast(unixepoch('subsec') * 1000 as integer)) NOT NULL,
 	CONSTRAINT `fk_item_matter_id_matter_id_fk` FOREIGN KEY (`matter_id`) REFERENCES `matter`(`id`) ON DELETE CASCADE,
+	CONSTRAINT `fk_item_sub_warehouse_id_sub_warehouse_id_fk` FOREIGN KEY (`sub_warehouse_id`) REFERENCES `sub_warehouse`(`id`) ON DELETE CASCADE,
 	CONSTRAINT "item_status_check" CHECK("status" in ('active', 'archived')),
 	CONSTRAINT "item_stock_non_negative" CHECK("stock" >= 0),
 	CONSTRAINT "item_min_stock_non_negative" CHECK("min_stock" >= 0),
@@ -182,6 +186,7 @@ CREATE TABLE `revoke_request` (
 CREATE TABLE `stock_movement` (
 	`id` text PRIMARY KEY,
 	`matter_id` text NOT NULL,
+	`sub_warehouse_id` text NOT NULL,
 	`item_id` text NOT NULL,
 	`type` text NOT NULL,
 	`quantity_delta` integer NOT NULL,
@@ -193,9 +198,50 @@ CREATE TABLE `stock_movement` (
 	`note` text,
 	`created_at` integer DEFAULT (cast(unixepoch('subsec') * 1000 as integer)) NOT NULL,
 	CONSTRAINT `fk_stock_movement_matter_id_matter_id_fk` FOREIGN KEY (`matter_id`) REFERENCES `matter`(`id`) ON DELETE CASCADE,
+	CONSTRAINT `fk_stock_movement_sub_warehouse_id_sub_warehouse_id_fk` FOREIGN KEY (`sub_warehouse_id`) REFERENCES `sub_warehouse`(`id`) ON DELETE CASCADE,
 	CONSTRAINT `fk_stock_movement_item_id_item_id_fk` FOREIGN KEY (`item_id`) REFERENCES `item`(`id`) ON DELETE CASCADE,
-	CONSTRAINT "stock_movement_type_check" CHECK("type" in ('initial', 'inbound', 'consumption', 'revoke', 'adjustment')),
+	CONSTRAINT "stock_movement_type_check" CHECK("type" in ('initial', 'inbound', 'consumption', 'revoke', 'adjustment', 'transfer_in', 'transfer_out')),
 	CONSTRAINT "stock_movement_stock_after_non_negative" CHECK("stock_after" >= 0)
+);
+--> statement-breakpoint
+CREATE TABLE `stock_transfer` (
+	`id` text PRIMARY KEY,
+	`matter_id` text NOT NULL,
+	`from_sub_warehouse_id` text NOT NULL,
+	`to_sub_warehouse_id` text NOT NULL,
+	`source_item_id` text NOT NULL,
+	`target_item_id` text NOT NULL,
+	`item_name` text NOT NULL,
+	`item_spec` text,
+	`unit` text NOT NULL,
+	`quantity` integer NOT NULL,
+	`operator_user_id` text NOT NULL,
+	`operator_name` text NOT NULL,
+	`note` text,
+	`created_at` integer DEFAULT (cast(unixepoch('subsec') * 1000 as integer)) NOT NULL,
+	CONSTRAINT `fk_stock_transfer_matter_id_matter_id_fk` FOREIGN KEY (`matter_id`) REFERENCES `matter`(`id`) ON DELETE CASCADE,
+	CONSTRAINT `fk_stock_transfer_from_sub_warehouse_id_sub_warehouse_id_fk` FOREIGN KEY (`from_sub_warehouse_id`) REFERENCES `sub_warehouse`(`id`) ON DELETE RESTRICT,
+	CONSTRAINT `fk_stock_transfer_to_sub_warehouse_id_sub_warehouse_id_fk` FOREIGN KEY (`to_sub_warehouse_id`) REFERENCES `sub_warehouse`(`id`) ON DELETE RESTRICT,
+	CONSTRAINT `fk_stock_transfer_source_item_id_item_id_fk` FOREIGN KEY (`source_item_id`) REFERENCES `item`(`id`) ON DELETE RESTRICT,
+	CONSTRAINT `fk_stock_transfer_target_item_id_item_id_fk` FOREIGN KEY (`target_item_id`) REFERENCES `item`(`id`) ON DELETE RESTRICT,
+	CONSTRAINT "stock_transfer_quantity_positive" CHECK("quantity" > 0),
+	CONSTRAINT "stock_transfer_warehouses_differ" CHECK("from_sub_warehouse_id" <> "to_sub_warehouse_id")
+);
+--> statement-breakpoint
+CREATE TABLE `sub_warehouse` (
+	`id` text PRIMARY KEY,
+	`matter_id` text NOT NULL,
+	`name` text NOT NULL,
+	`code` text,
+	`location` text,
+	`description` text,
+	`status` text DEFAULT 'active' NOT NULL,
+	`sort_order` integer DEFAULT 0 NOT NULL,
+	`created_at` integer DEFAULT (cast(unixepoch('subsec') * 1000 as integer)) NOT NULL,
+	`updated_at` integer DEFAULT (cast(unixepoch('subsec') * 1000 as integer)) NOT NULL,
+	CONSTRAINT `fk_sub_warehouse_matter_id_matter_id_fk` FOREIGN KEY (`matter_id`) REFERENCES `matter`(`id`) ON DELETE CASCADE,
+	CONSTRAINT "sub_warehouse_status_check" CHECK("status" in ('active', 'archived')),
+	CONSTRAINT "sub_warehouse_name_length" CHECK(length(trim("name")) between 1 and 60)
 );
 --> statement-breakpoint
 CREATE TABLE `team` (
@@ -227,8 +273,12 @@ CREATE TABLE `usage_item` (
 CREATE TABLE `usage_record` (
 	`id` text PRIMARY KEY,
 	`matter_id` text NOT NULL,
+	`sub_warehouse_id` text NOT NULL,
 	`record_id` text,
 	`used_at` text NOT NULL,
+	`used_at_time` text,
+	`is_backfill` integer DEFAULT false NOT NULL,
+	`backfill_reason` text,
 	`patient_name` text NOT NULL,
 	`patient_type` text NOT NULL,
 	`patient_no` text NOT NULL,
@@ -241,20 +291,13 @@ CREATE TABLE `usage_record` (
 	`created_at` integer DEFAULT (cast(unixepoch('subsec') * 1000 as integer)) NOT NULL,
 	`updated_at` integer DEFAULT (cast(unixepoch('subsec') * 1000 as integer)) NOT NULL,
 	CONSTRAINT `fk_usage_record_matter_id_matter_id_fk` FOREIGN KEY (`matter_id`) REFERENCES `matter`(`id`) ON DELETE CASCADE,
+	CONSTRAINT `fk_usage_record_sub_warehouse_id_sub_warehouse_id_fk` FOREIGN KEY (`sub_warehouse_id`) REFERENCES `sub_warehouse`(`id`) ON DELETE RESTRICT,
 	CONSTRAINT `fk_usage_record_record_id_handover_record_id_fk` FOREIGN KEY (`record_id`) REFERENCES `handover_record`(`id`) ON DELETE SET NULL,
 	CONSTRAINT "usage_record_status_check" CHECK("status" in ('active', 'revoke_pending', 'revoked')),
 	CONSTRAINT "usage_record_patient_type_check" CHECK("patient_type" in ('outpatient', 'inpatient')),
-	CONSTRAINT "usage_record_date_format" CHECK(length("used_at") = 10 and "used_at" glob '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]')
-);
---> statement-breakpoint
-CREATE TABLE `todos` (
-	`completed` integer DEFAULT false NOT NULL,
-	`created_at` integer DEFAULT (cast(unixepoch('subsec') * 1000 as integer)) NOT NULL,
-	`id` integer PRIMARY KEY AUTOINCREMENT,
-	`title` text NOT NULL,
-	`user_id` text NOT NULL,
-	CONSTRAINT `fk_todos_user_id_user_id_fk` FOREIGN KEY (`user_id`) REFERENCES `user`(`id`) ON DELETE CASCADE,
-	CONSTRAINT "todos_title_length" CHECK(length(trim("title")) between 1 and 200)
+	CONSTRAINT "usage_record_date_format" CHECK(length("used_at") = 10 and "used_at" glob '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+	CONSTRAINT "usage_record_time_format" CHECK("used_at_time" is null or "used_at_time" glob '[0-2][0-9]:[0-5][0-9]'),
+	CONSTRAINT "usage_record_backfill_reason" CHECK("is_backfill" = 0 or ("backfill_reason" is not null and length(trim("backfill_reason")) between 2 and 300))
 );
 --> statement-breakpoint
 CREATE INDEX `account_user_id_idx` ON `account` (`user_id`);--> statement-breakpoint
@@ -264,13 +307,15 @@ CREATE INDEX `user_team_idx` ON `user` (`team_id`);--> statement-breakpoint
 CREATE INDEX `verification_identifier_idx` ON `verification` (`identifier`);--> statement-breakpoint
 CREATE INDEX `exception_event_matter_status_idx` ON `exception_event` (`matter_id`,`status`);--> statement-breakpoint
 CREATE INDEX `exception_event_record_idx` ON `exception_event` (`record_id`);--> statement-breakpoint
-CREATE UNIQUE INDEX `handover_record_matter_date_unique` ON `handover_record` (`matter_id`,`record_date`);--> statement-breakpoint
+CREATE UNIQUE INDEX `handover_record_sub_warehouse_date_unique` ON `handover_record` (`sub_warehouse_id`,`record_date`);--> statement-breakpoint
 CREATE INDEX `handover_record_matter_created_idx` ON `handover_record` (`matter_id`,`created_at`);--> statement-breakpoint
+CREATE INDEX `handover_record_sub_warehouse_created_idx` ON `handover_record` (`sub_warehouse_id`,`created_at`);--> statement-breakpoint
 CREATE INDEX `handover_record_status_idx` ON `handover_record` (`status`);--> statement-breakpoint
 CREATE INDEX `handover_record_item_record_idx` ON `handover_record_item` (`record_id`);--> statement-breakpoint
 CREATE UNIQUE INDEX `handover_record_item_record_item_unique` ON `handover_record_item` (`record_id`,`item_id`);--> statement-breakpoint
-CREATE UNIQUE INDEX `item_matter_name_unique` ON `item` (`matter_id`,`name`);--> statement-breakpoint
+CREATE UNIQUE INDEX `item_sub_warehouse_name_unique` ON `item` (`sub_warehouse_id`,`name`);--> statement-breakpoint
 CREATE INDEX `item_matter_status_idx` ON `item` (`matter_id`,`status`);--> statement-breakpoint
+CREATE INDEX `item_sub_warehouse_status_idx` ON `item` (`sub_warehouse_id`,`status`);--> statement-breakpoint
 CREATE UNIQUE INDEX `matter_qr_token_unique` ON `matter` (`qr_token`);--> statement-breakpoint
 CREATE UNIQUE INDEX `matter_team_name_unique` ON `matter` (`team_id`,`name`);--> statement-breakpoint
 CREATE INDEX `matter_team_status_idx` ON `matter` (`team_id`,`status`);--> statement-breakpoint
@@ -278,11 +323,17 @@ CREATE INDEX `revoke_request_status_idx` ON `revoke_request` (`status`);--> stat
 CREATE INDEX `revoke_request_usage_idx` ON `revoke_request` (`usage_id`);--> statement-breakpoint
 CREATE INDEX `stock_movement_item_created_idx` ON `stock_movement` (`item_id`,`created_at`);--> statement-breakpoint
 CREATE INDEX `stock_movement_matter_created_idx` ON `stock_movement` (`matter_id`,`created_at`);--> statement-breakpoint
+CREATE INDEX `stock_movement_sub_warehouse_created_idx` ON `stock_movement` (`sub_warehouse_id`,`created_at`);--> statement-breakpoint
+CREATE INDEX `stock_transfer_matter_created_idx` ON `stock_transfer` (`matter_id`,`created_at`);--> statement-breakpoint
+CREATE INDEX `stock_transfer_from_created_idx` ON `stock_transfer` (`from_sub_warehouse_id`,`created_at`);--> statement-breakpoint
+CREATE INDEX `stock_transfer_to_created_idx` ON `stock_transfer` (`to_sub_warehouse_id`,`created_at`);--> statement-breakpoint
+CREATE UNIQUE INDEX `sub_warehouse_matter_name_unique` ON `sub_warehouse` (`matter_id`,`name`);--> statement-breakpoint
+CREATE INDEX `sub_warehouse_matter_status_idx` ON `sub_warehouse` (`matter_id`,`status`);--> statement-breakpoint
 CREATE UNIQUE INDEX `team_name_unique` ON `team` (`name`);--> statement-breakpoint
 CREATE UNIQUE INDEX `team_code_unique` ON `team` (`code`);--> statement-breakpoint
 CREATE INDEX `usage_item_usage_idx` ON `usage_item` (`usage_id`);--> statement-breakpoint
 CREATE INDEX `usage_item_item_idx` ON `usage_item` (`item_id`);--> statement-breakpoint
 CREATE INDEX `usage_record_matter_used_at_idx` ON `usage_record` (`matter_id`,`used_at`);--> statement-breakpoint
+CREATE INDEX `usage_record_sub_warehouse_used_at_idx` ON `usage_record` (`sub_warehouse_id`,`used_at`);--> statement-breakpoint
 CREATE INDEX `usage_record_record_idx` ON `usage_record` (`record_id`);--> statement-breakpoint
-CREATE INDEX `usage_record_status_idx` ON `usage_record` (`status`);--> statement-breakpoint
-CREATE INDEX `todos_user_id_idx` ON `todos` (`user_id`);
+CREATE INDEX `usage_record_status_idx` ON `usage_record` (`status`);

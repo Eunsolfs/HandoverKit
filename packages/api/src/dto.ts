@@ -8,6 +8,8 @@ import type {
   matter,
   revokeRequest,
   stockMovement,
+  stockTransfer,
+  subWarehouse,
   team,
   usageItem,
   usageRecord,
@@ -20,6 +22,7 @@ import {
   MATTER_STATUS_VALUES,
   MOVEMENT_TYPE_VALUES,
   PATIENT_TYPE_VALUES,
+  SUB_WAREHOUSE_STATUS_VALUES,
   RECORD_STATUS_VALUES,
   REVOKE_STATUS_VALUES,
   TEAM_STATUS_VALUES,
@@ -76,6 +79,10 @@ type ExceptionRow = typeof exceptionEvent.$inferSelect;
 
 type MovementRow = typeof stockMovement.$inferSelect;
 
+type SubWarehouseRow = typeof subWarehouse.$inferSelect;
+
+type StockTransferRow = typeof stockTransfer.$inferSelect;
+
 export interface ProfileDto {
   id: string;
   name: string;
@@ -116,9 +123,25 @@ export interface MatterDto {
   createdAt: number;
 }
 
+export interface SubWarehouseDto {
+  id: string;
+  matterId: string;
+  name: string;
+  code: string | null;
+  location: string | null;
+  description: string | null;
+  status: "active" | "archived";
+  sortOrder: number;
+  itemCount: number;
+  totalStock: number;
+  createdAt: number;
+}
+
 export interface ItemDto {
   id: string;
   matterId: string;
+  subWarehouseId: string;
+  subWarehouseName: string;
   name: string;
   spec: string | null;
   unit: string;
@@ -151,6 +174,8 @@ export interface RecordSummaryDto {
   id: string;
   matterId: string;
   matterName: string;
+  subWarehouseId: string;
+  subWarehouseName: string;
   recordDate: string;
   status: RecordStatus;
   acceptedByName: string | null;
@@ -184,6 +209,7 @@ export interface RecordDetailDto extends RecordSummaryDto {
 
 export interface UsageItemDto {
   itemId: string;
+  sourceSubWarehouseName: string;
   itemName: string;
   itemSpec: string | null;
   unit: string;
@@ -194,8 +220,16 @@ export interface UsageDto {
   id: string;
   matterId: string;
   matterName: string;
+  subWarehouseId: string;
+  subWarehouseName: string;
   recordId: string | null;
   usedAt: string;
+  /** 补录时的具体使用时间（HH:mm）；普通登记为 null。 */
+  usedAtTime: string | null;
+  /** 是否为补登记记录。 */
+  isBackfill: boolean;
+  /** 补录原因（isBackfill 为 true 时必有值）。 */
+  backfillReason: string | null;
   patientName: string;
   patientType: PatientType;
   patientNo: string;
@@ -240,12 +274,29 @@ export interface ExceptionDto {
 
 export interface StockMovementDto {
   id: string;
+  subWarehouseId: string;
   type: StockMovementType;
   quantityDelta: number;
   stockAfter: number;
   operatorName: string;
   refType: string | null;
   refId: string | null;
+  note: string | null;
+  createdAt: number;
+}
+
+export interface StockTransferDto {
+  id: string;
+  matterId: string;
+  fromSubWarehouseId: string;
+  fromSubWarehouseName: string;
+  toSubWarehouseId: string;
+  toSubWarehouseName: string;
+  itemName: string;
+  itemSpec: string | null;
+  unit: string;
+  quantity: number;
+  operatorName: string;
   note: string | null;
   createdAt: number;
 }
@@ -356,7 +407,7 @@ export const toMatterDto = (
   todayStatus,
 });
 
-export const toItemDto = (row: ItemRow): ItemDto => ({
+export const toItemDto = (row: ItemRow, subWarehouseName: string): ItemDto => ({
   category: row.category,
   createdAt: requireMs(row.createdAt),
   id: row.id,
@@ -369,6 +420,8 @@ export const toItemDto = (row: ItemRow): ItemDto => ({
   spec: row.spec,
   status: pick(row.status, ITEM_STATUS_VALUES, "active"),
   stock: row.stock,
+  subWarehouseId: row.subWarehouseId,
+  subWarehouseName,
   unit: row.unit,
 });
 
@@ -390,6 +443,7 @@ const toRecordItemDto = (row: RecordItemRow): RecordItemDto => ({
 export const toRecordSummaryDto = (
   row: RecordRow,
   matterName: string,
+  subWarehouseName: string,
   itemCount: number,
   diffCount: number,
   usageCount: number
@@ -404,6 +458,8 @@ export const toRecordSummaryDto = (
   matterId: row.matterId,
   matterName,
   recordDate: row.recordDate,
+  subWarehouseId: row.subWarehouseId,
+  subWarehouseName,
   status: toRecordStatus(row.status),
   usageCount,
 });
@@ -431,11 +487,15 @@ export const toRecordDetailDto = (
   usages: extras.usages,
 });
 
-const toUsageItemDto = (row: UsageItemRow): UsageItemDto => ({
+const toUsageItemDto = (
+  row: UsageItemRow,
+  sourceSubWarehouseName: string
+): UsageItemDto => ({
   itemId: row.itemId,
   itemName: row.itemName,
   itemSpec: row.itemSpec,
   quantity: row.quantity,
+  sourceSubWarehouseName,
   unit: row.unit,
 });
 
@@ -454,26 +514,34 @@ export const toRevokeRequestDto = (row: RevokeRow): RevokeRequestDto => ({
 export const toUsageDto = (
   row: UsageRow,
   matterName: string,
-  items: UsageItemRow[],
+  subWarehouseName: string,
+  items: { row: UsageItemRow; sourceSubWarehouseName: string }[],
   latestRevoke: RevokeRow | null
 ): UsageDto => ({
   createdAt: requireMs(row.createdAt),
   id: row.id,
-  items: items.map(toUsageItemDto),
+  items: items.map((itemRow) =>
+    toUsageItemDto(itemRow.row, itemRow.sourceSubWarehouseName)
+  ),
   matterId: row.matterId,
   matterName,
+  subWarehouseId: row.subWarehouseId,
+  subWarehouseName,
   note: row.note,
+  backfillReason: row.backfillReason,
+  isBackfill: row.isBackfill,
   operatorName: row.operatorName,
   patientName: row.patientName,
   patientNo: row.patientNo,
   patientPhone: row.patientPhone,
   patientType: pick(row.patientType, PATIENT_TYPE_VALUES, "outpatient"),
   recordId: row.recordId,
+  usedAt: row.usedAt,
+  usedAtTime: row.usedAtTime,
   revokeRequest:
     latestRevoke === null ? null : toRevokeRequestDto(latestRevoke),
   status: pick(row.status, USAGE_STATUS_VALUES, "active"),
-  totalQuantity: items.reduce((sum, line) => sum + line.quantity, 0),
-  usedAt: row.usedAt,
+  totalQuantity: items.reduce((sum, line) => sum + line.row.quantity, 0),
 });
 
 export const toExceptionDto = (
@@ -505,5 +573,44 @@ export const toStockMovementDto = (row: MovementRow): StockMovementDto => ({
   refId: row.refId,
   refType: row.refType,
   stockAfter: row.stockAfter,
+  subWarehouseId: row.subWarehouseId,
   type: pick(row.type, MOVEMENT_TYPE_VALUES, "adjustment"),
+});
+
+export const toSubWarehouseDto = (
+  row: SubWarehouseRow,
+  itemCount: number,
+  totalStock: number
+): SubWarehouseDto => ({
+  code: row.code,
+  createdAt: requireMs(row.createdAt),
+  description: row.description,
+  id: row.id,
+  itemCount,
+  location: row.location,
+  matterId: row.matterId,
+  name: row.name,
+  sortOrder: row.sortOrder,
+  status: pick(row.status, SUB_WAREHOUSE_STATUS_VALUES, "active"),
+  totalStock,
+});
+
+export const toStockTransferDto = (
+  row: StockTransferRow,
+  fromSubWarehouseName: string,
+  toSubWarehouseName: string
+): StockTransferDto => ({
+  createdAt: requireMs(row.createdAt),
+  fromSubWarehouseId: row.fromSubWarehouseId,
+  fromSubWarehouseName,
+  id: row.id,
+  itemName: row.itemName,
+  itemSpec: row.itemSpec,
+  matterId: row.matterId,
+  note: row.note,
+  operatorName: row.operatorName,
+  quantity: row.quantity,
+  toSubWarehouseId: row.toSubWarehouseId,
+  toSubWarehouseName,
+  unit: row.unit,
 });

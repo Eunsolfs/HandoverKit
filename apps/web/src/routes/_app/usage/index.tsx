@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { PlusIcon, RotateCcwIcon } from "lucide-react";
+import { HistoryIcon, PlusIcon, RotateCcwIcon } from "lucide-react";
 import { useState } from "react";
 import type { ReactNode } from "react";
 import { toast } from "sonner";
@@ -57,7 +57,14 @@ const monthRange = (): DateRangeValue => {
 
 const usageSummary = (usage: UsageDto): string =>
   usage.items
-    .map((item) => `${item.itemName} × ${item.quantity} ${item.unit}`)
+    .map((item) => {
+      const source =
+        item.sourceSubWarehouseName === usage.subWarehouseName
+          ? ""
+          : `（${item.sourceSubWarehouseName}）`;
+
+      return `${item.itemName}${source} × ${item.quantity} ${item.unit}`;
+    })
     .join("、");
 
 interface UsageActionsProps {
@@ -93,9 +100,18 @@ const buildUsageColumns = (
 ): DataTableColumn<UsageDto>[] => [
   {
     cell: (usage) => (
-      <span className="tabular-nums">{formatRecordDate(usage.usedAt)}</span>
+      <div className="grid gap-0.5">
+        <span className="tabular-nums">
+          {formatRecordDate(usage.usedAt)}
+          {usage.usedAtTime === null ? "" : ` ${usage.usedAtTime}`}
+        </span>
+        <span className="text-muted-foreground text-xs">
+          {usage.subWarehouseName}
+          {usage.isBackfill ? " · 补录" : ""}
+        </span>
+      </div>
     ),
-    header: "使用日期",
+    header: "使用日期 / 子仓库",
     key: "usedAt",
   },
   {
@@ -144,21 +160,32 @@ const buildUsageColumns = (
 interface UsageCreateDialogProps {
   matters: MatterDto[];
   defaultMatterId: string | null;
+  mode: "normal" | "backfill";
   operatorName: string;
   onClose: () => void;
 }
 
+// eslint-disable-next-line complexity
 const UsageCreateDialog = ({
   defaultMatterId,
   matters,
+  mode,
   onClose,
   operatorName,
 }: UsageCreateDialogProps) => {
   const queryClient = useQueryClient();
+  const isBackfill = mode === "backfill";
 
   const [matterId, setMatterId] = useState(
     defaultMatterId ?? matters[0]?.id ?? ""
   );
+
+  const [subWarehouseId, setSubWarehouseId] = useState("");
+
+  const warehousesQuery = useQuery({
+    ...api.subWarehouses.list.queryOptions({ input: { matterId } }),
+    enabled: matterId.length > 0,
+  });
 
   const itemsQuery = useQuery({
     ...api.items.list.queryOptions({ input: { matterId } }),
@@ -174,25 +201,76 @@ const UsageCreateDialog = ({
     },
   });
 
+  const backfillMutation = useMutation({
+    ...api.usage.backfill.mutationOptions(),
+    onSuccess: () => {
+      toast.success("补登记成功，库存已扣减");
+      void queryClient.invalidateQueries();
+      onClose();
+    },
+  });
+
   const matterOptions = matters.map((matter) => ({
     label: matter.name,
     value: matter.id,
   }));
 
+  const warehouses = warehousesQuery.data ?? [];
+
+  const selectedWarehouseId =
+    subWarehouseId.length > 0 ? subWarehouseId : (warehouses[0]?.id ?? "");
+
   const handleSubmit = (value: UsageEntryValue) => {
-    createMutation.mutate({ matterId, ...value });
+    const base = {
+      items: value.items,
+      matterId,
+      note: value.note,
+      operatorName: value.operatorName,
+      patientName: value.patientName,
+      patientNo: value.patientNo,
+      patientPhone: value.patientPhone,
+      patientType: value.patientType,
+      subWarehouseId: selectedWarehouseId,
+      usedAt: value.usedAt,
+    };
+
+    if (isBackfill) {
+      backfillMutation.mutate({
+        ...base,
+        backfillReason: value.backfillReason ?? "",
+        usedTime: value.usedTime ?? "",
+      });
+
+      return;
+    }
+
+    createMutation.mutate(base);
   };
 
   const items = itemsQuery.data ?? [];
+
+  const pending = isBackfill
+    ? backfillMutation.isPending
+    : createMutation.isPending;
+
+  const error = isBackfill ? backfillMutation.error : createMutation.error;
+
   let itemsSection: ReactNode;
 
-  if (itemsQuery.isPending) {
+  if (warehousesQuery.isPending || itemsQuery.isPending) {
     itemsSection = <p className="text-muted-foreground text-sm">物品加载中…</p>;
-  } else if (itemsQuery.isError) {
+  } else if (warehousesQuery.isError || itemsQuery.isError) {
     itemsSection = (
       <p className="text-destructive text-sm" role="alert">
-        {itemsQuery.error.message}
+        {(warehousesQuery.error ?? itemsQuery.error)?.message}
       </p>
+    );
+  } else if (warehouses.length === 0) {
+    itemsSection = (
+      <EmptyState
+        description="请先在事项二维码页为交接事项创建子仓库。"
+        title="没有可用子仓库"
+      />
     );
   } else if (items.length === 0) {
     itemsSection = (
@@ -206,9 +284,10 @@ const UsageCreateDialog = ({
       <UsageEntryForm
         defaultOperatorName={operatorName}
         items={items}
+        mode={mode}
         onSubmit={handleSubmit}
-        pending={createMutation.isPending}
-        submitLabel="提交登记"
+        pending={pending}
+        submitLabel={isBackfill ? "提交补登记" : "提交登记"}
       />
     );
   }
@@ -224,9 +303,13 @@ const UsageCreateDialog = ({
     >
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>用物消耗登记</DialogTitle>
+          <DialogTitle>
+            {isBackfill ? "用物补登记" : "用物消耗登记"}
+          </DialogTitle>
           <DialogDescription>
-            物品只能从所选交接事项的仓库中选择，提交后立即扣减库存。登记日期必须已完成接班核对并确认接收；如数量有差异需先在扫码页完成异常上报。
+            {isBackfill
+              ? "补登记不受接班门禁限制，但必须填写使用时间、数量和补录原因；提交后立即扣减对应子仓库库存。"
+              : "登记日期必须已完成该子仓库的接班核对并确认接收；如接班数量有差异，需先提交异常上报。物品可跨子仓库选择（会扣减来源子仓库库存）。"}
           </DialogDescription>
         </DialogHeader>
 
@@ -240,7 +323,7 @@ const UsageCreateDialog = ({
             <FormField id="usage-matter" label="交接事项" required>
               {(field) => (
                 <Select
-                  disabled={createMutation.isPending}
+                  disabled={pending}
                   items={matterOptions}
                   onValueChange={(value: string | null) => {
                     if (value === null) {
@@ -248,6 +331,7 @@ const UsageCreateDialog = ({
                     }
 
                     setMatterId(value);
+                    setSubWarehouseId("");
                   }}
                   value={matterId}
                 >
@@ -265,10 +349,50 @@ const UsageCreateDialog = ({
               )}
             </FormField>
 
+            <FormField
+              hint={
+                isBackfill
+                  ? "补录记到该子仓库名下；物品可从其他子仓库借取"
+                  : "当前班次所在子仓库，交接与消耗按它统计"
+              }
+              id="usage-sub-warehouse"
+              label="使用子仓库"
+              required
+            >
+              {(field) => (
+                <Select
+                  disabled={pending || warehouses.length === 0}
+                  items={warehouses.map((warehouse) => ({
+                    label: `${warehouse.name}（${warehouse.itemCount} 种）`,
+                    value: warehouse.id,
+                  }))}
+                  onValueChange={(value: string | null) => {
+                    if (value === null) {
+                      return;
+                    }
+
+                    setSubWarehouseId(value);
+                  }}
+                  value={selectedWarehouseId}
+                >
+                  <SelectTrigger className="w-full" id={field.id}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {warehouses.map((warehouse) => (
+                      <SelectItem key={warehouse.id} value={warehouse.id}>
+                        {warehouse.name}（{warehouse.itemCount} 种）
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </FormField>
+
             {itemsSection}
-            {createMutation.error === null ? null : (
+            {error === null ? null : (
               <p className="text-destructive text-sm" role="alert">
-                {createMutation.error.message}
+                {error.message}
               </p>
             )}
           </div>
@@ -380,7 +504,11 @@ const UsagePage = () => {
 
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
-  const [createOpen, setCreateOpen] = useState(false);
+
+  const [createMode, setCreateMode] = useState<"normal" | "backfill" | null>(
+    null
+  );
+
   const [revokeTarget, setRevokeTarget] = useState<UsageDto | null>(null);
 
   const mattersQuery = useQuery({
@@ -436,16 +564,29 @@ const UsagePage = () => {
     <div className="grid gap-6">
       <PageHeader
         actions={
-          <Button
-            disabled={matters.length === 0}
-            onClick={() => {
-              setCreateOpen(true);
-            }}
-            size="sm"
-          >
-            <PlusIcon />
-            登记用物
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              disabled={matters.length === 0}
+              onClick={() => {
+                setCreateMode("normal");
+              }}
+              size="sm"
+            >
+              <PlusIcon />
+              登记用物
+            </Button>
+            <Button
+              disabled={matters.length === 0}
+              onClick={() => {
+                setCreateMode("backfill");
+              }}
+              size="sm"
+              variant="outline"
+            >
+              <HistoryIcon />
+              补登记
+            </Button>
+          </div>
         }
         description="登记患者用物消耗；撤销需管理员审批，通过后自动恢复库存"
         title="用物消耗"
@@ -551,17 +692,18 @@ const UsagePage = () => {
         />
       )}
 
-      {createOpen ? (
+      {createMode === null ? null : (
         <UsageCreateDialog
           defaultMatterId={matterId.length === 0 ? null : matterId}
           matters={matters}
+          mode={createMode}
           onClose={() => {
-            setCreateOpen(false);
+            setCreateMode(null);
             void queryClient.invalidateQueries();
           }}
           operatorName={me.data?.user.name ?? ""}
         />
-      ) : null}
+      )}
 
       {revokeTarget === null ? null : (
         <RevokeDialog

@@ -110,6 +110,20 @@ Better Auth 负责会话与密码；业务字段直接加在同一张表。
 | note           | text NULL                                                                        | 原因/备注                         |
 | createdAt      | integer ms NOT NULL                                                              |                                   |
 
+### 2.5.1 stock_transfer（调拨记录）
+
+| 字段                                        | 类型    | 约束             | 说明                |
+| ------------------------------------------- | ------- | ---------------- | ------------------- |
+| id                                          | text    | PK               |                     |
+| matter_id                                   | text    | FK matter        | 所属事项            |
+| from_sub_warehouse_id / to_sub_warehouse_id | text    | FK sub_warehouse | 调出/调入，必须不同 |
+| source_item_id / target_item_id             | text    | FK item          | 来源/目标物品       |
+| item_name / item_spec / unit                | text    | 快照             | 调拨物品信息        |
+| quantity                                    | integer | > 0              | 调拨数量            |
+| operator_user_id / operator_name            | text    |                  | 操作人              |
+| note                                        | text    |                  | 备注                |
+| created_at                                  | integer | timestamp_ms     |                     |
+
 ### 2.6 handover_record（交接记录）
 
 | 字段                  | 类型                                                                          | 说明                   |
@@ -148,6 +162,14 @@ Better Auth 负责会话与密码；业务字段直接加在同一张表。
 | handoverNote               | text NULL                                             | 交班备注                     |
 
 ### 2.8 usage_record（用物消耗记录）
+
+| 字段             | 类型          | 约束                   | 说明                 |
+| ---------------- | ------------- | ---------------------- | -------------------- |
+| matter_id        | text          | FK matter              | 所属事项             |
+| sub_warehouse_id | text          | FK sub_warehouse       | 使用发生的班次子仓库 |
+| used_at_time     | text          | nullable, HH:mm        | 补录的具体使用时间   |
+| is_backfill      | integer(bool) | NOT NULL default false | 是否补登记           |
+| backfill_reason  | text          | 补录时必填 2–300 字    | 补录原因             |
 
 | 字段                  | 类型                                                         | 说明                     |
 | --------------------- | ------------------------------------------------------------ | ------------------------ |

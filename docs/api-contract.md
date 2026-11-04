@@ -80,9 +80,25 @@ interface MatterDto {
   createdAt: number;
 }
 
+interface SubWarehouseDto {
+  id: string;
+  matterId: string;
+  name: string;
+  code: string | null;
+  location: string | null;
+  description: string | null;
+  status: "active" | "archived";
+  sortOrder: number;
+  itemCount: number;
+  totalStock: number;
+  createdAt: number;
+}
+
 interface ItemDto {
   id: string;
   matterId: string;
+  subWarehouseId: string;
+  subWarehouseName: string;
   name: string;
   spec: string | null;
   unit: string;
@@ -115,6 +131,8 @@ interface RecordSummaryDto {
   id: string;
   matterId: string;
   matterName: string;
+  subWarehouseId: string;
+  subWarehouseName: string;
   recordDate: string;
   status: RecordStatus;
   acceptedByName: string | null;
@@ -147,6 +165,7 @@ interface RecordDetailDto extends RecordSummaryDto {
 interface UsageItemDto {
   itemId: string;
   itemName: string;
+  sourceSubWarehouseName: string;
   itemSpec: string | null;
   unit: string;
   quantity: number;
@@ -156,8 +175,13 @@ interface UsageDto {
   id: string;
   matterId: string;
   matterName: string;
+  subWarehouseId: string;
+  subWarehouseName: string;
   recordId: string | null;
   usedAt: string;
+  usedAtTime: string | null;
+  isBackfill: boolean;
+  backfillReason: string | null;
   patientName: string;
   patientType: "outpatient" | "inpatient";
   patientNo: string;
@@ -275,52 +299,67 @@ interface StatsOverviewDto {
 
 ### 4.4 matters（交接事项）
 
-| Procedure          | 入参                                          | 返回                                                                             | 权限                           |
-| ------------------ | --------------------------------------------- | -------------------------------------------------------------------------------- | ------------------------------ |
-| `matters.list`     | `{ teamId?, includeArchived? }`               | `MatterDto[]`                                                                    | 登录                           |
-| `matters.create`   | `{ name, code?, description?, teamId? }`      | `MatterDto`                                                                      | 管理员                         |
-| `matters.update`   | `{ id, name?, code?, description?, status? }` | `MatterDto`                                                                      | 管理员                         |
-| `matters.rotateQr` | `{ id }`                                      | `{ qrToken, qrVersion }`                                                         | 管理员；生成新 token，旧码失效 |
-| `matters.byToken`  | `{ token }`                                   | `{ matter: MatterDto; team: TeamDto; today: RecordDetailDto; items: ItemDto[] }` | 登录且属于该团队               |
-| `matters.archive`  | `{ id }`                                      | `MatterDto`                                                                      | 管理员（归档，不物理删除）     |
+| Procedure          | 入参                                          | 返回                                                                                                                   | 权限                                               |
+| ------------------ | --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| `matters.list`     | `{ teamId?, includeArchived? }`               | `MatterDto[]`                                                                                                          | 登录                                               |
+| `matters.create`   | `{ name, code?, description?, teamId? }`      | `MatterDto`                                                                                                            | 管理员                                             |
+| `matters.update`   | `{ id, name?, code?, description?, status? }` | `MatterDto`                                                                                                            | 管理员                                             |
+| `matters.rotateQr` | `{ id }`                                      | `{ qrToken, qrVersion }`                                                                                               | 管理员；生成新 token，旧码失效                     |
+| `matters.byToken`  | `{ token, subWarehouseId? }`                  | `{ matter; team; subWarehouses: SubWarehouseDto[]; selectedSubWarehouseId; today: RecordDetailDto; items: ItemDto[] }` | 登录且属于该团队；不传子仓库时默认第一个启用子仓库 |
+| `matters.archive`  | `{ id }`                                      | `MatterDto`                                                                                                            | 管理员（归档，不物理删除）                         |
+
+### 4.4.1 subWarehouses（子仓库）
+
+| Procedure              | 入参                                                                 | 返回                | 权限                                        |
+| ---------------------- | -------------------------------------------------------------------- | ------------------- | ------------------------------------------- |
+| `subWarehouses.list`   | `{ matterId, includeArchived? }`                                     | `SubWarehouseDto[]` | 登录（团队隔离）                            |
+| `subWarehouses.create` | `{ matterId, name, code?, location?, description?, sortOrder? }`     | `SubWarehouseDto`   | 管理员；同一事项名称唯一                    |
+| `subWarehouses.update` | `{ id, name?, code?, location?, description?, sortOrder?, status? }` | `SubWarehouseDto`   | 管理员；停用后不可新交接/用物/调拨          |
+| `subWarehouses.remove` | `{ id }`                                                             | `{ ok: true }`      | 管理员；有物品/交接/消耗/调拨记录时只能停用 |
 
 ### 4.5 items
 
-| Procedure         | 入参                                                                              | 返回                                | 权限                                                                                       |
-| ----------------- | --------------------------------------------------------------------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------ |
-| `items.list`      | `{ matterId, includeArchived? }`                                                  | `ItemDto[]`                         | 登录（团队隔离）                                                                           |
-| `items.create`    | `{ matterId, name, spec?, unit, category?, stock?, minStock?, location?, note? }` | `ItemDto`                           | 管理员；stock>0 写 initial 流水                                                            |
-| `items.update`    | `{ id, name?, spec?, unit?, category?, minStock?, location?, note?, status? }`    | `ItemDto`                           | 管理员（不允许直接改 stock）                                                               |
-| `items.inbound`   | `{ id, quantity, note? }`                                                         | `ItemDto`                           | 管理员；库存 + quantity，写 inbound 流水                                                   |
-| `items.adjust`    | `{ id, quantityDelta, note }`                                                     | `ItemDto`                           | 管理员；盘点/异常调整，reason 必填，写 adjustment 流水                                     |
-| `items.movements` | `{ itemId }`                                                                      | `StockMovementDto[]`（最多 100 条） | 登录（团队隔离）                                                                           |
-| `items.remove`    | `{ id }`                                                                          | `{ ok: true }`                      | 管理员；有 usage_item / stock_movement / handover_record_item 快照时只能停用（`CONFLICT`） |
+| Procedure         | 入参                                                                                                | 返回                                | 权限                                                                                       |
+| ----------------- | --------------------------------------------------------------------------------------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------ |
+| `items.list`      | `{ matterId? , subWarehouseId?, includeArchived? }`                                                 | `ItemDto[]`                         | 登录（团队隔离）；matterId 与 subWarehouseId 至少一个                                      |
+| `items.create`    | `{ subWarehouseId?, matterId?, name, spec?, unit, category?, stock?, minStock?, location?, note? }` | `ItemDto`                           | 管理员；不传子仓库时取事项第一个启用子仓库；stock>0 写 initial 流水                        |
+| `items.update`    | `{ id, name?, spec?, unit?, category?, minStock?, location?, note?, status? }`                      | `ItemDto`                           | 管理员（不允许直接改 stock）                                                               |
+| `items.inbound`   | `{ id, quantity, note? }`                                                                           | `ItemDto`                           | 管理员；库存 + quantity，写 inbound 流水                                                   |
+| `items.adjust`    | `{ id, quantityDelta, note }`                                                                       | `ItemDto`                           | 管理员；盘点/异常调整，reason 必填，写 adjustment 流水                                     |
+| `items.movements` | `{ itemId }`                                                                                        | `StockMovementDto[]`（最多 100 条） | 登录（团队隔离）                                                                           |
+| `items.remove`    | `{ id }`                                                                                            | `{ ok: true }`                      | 管理员；有 usage_item / stock_movement / handover_record_item 快照时只能停用（`CONFLICT`） |
+| `items.transfer`  | `{ fromSubWarehouseId, toSubWarehouseId, itemId, quantity, note? }`                                 | `StockTransferDto`                  | 管理员；同事项、不同子仓库、双边事务扣增；调入无同名同规格物品时自动建档                   |
+| `items.transfers` | `{ matterId, subWarehouseId? }`                                                                     | `StockTransferDto[]`（最近 50 条）  | 登录（团队隔离）                                                                           |
 
 ### 4.6 records（交接记录）
 
-| Procedure                | 入参                                                                                                      | 返回                                                   | 权限                              |
-| ------------------------ | --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ | --------------------------------- |
-| `records.today`          | `{ matterId, date? }`                                                                                     | `RecordDetailDto`（不存在则创建）                      | 登录（团队隔离）                  |
-| `records.list`           | `{ matterId?, teamId?, period?: "day"\|"week"\|"month"\|"year", anchorDate?, status?, page?, pageSize? }` | `{ items: RecordSummaryDto[]; total; page; pageSize }` | 登录                              |
-| `records.get`            | `{ id }`                                                                                                  | `RecordDetailDto`                                      | 登录                              |
-| `records.accept`         | `{ id, items: { itemId, checked, actualQty?, note? }[], note? }`                                          | `RecordDetailDto`                                      | 登录；状态必须 pending_acceptance |
-| `records.submitHandover` | `{ id, items: { itemId, checked, actualQty?, note? }[], note? }`                                          | `RecordDetailDto`                                      | 登录；状态必须 accepted           |
-| `records.remove`         | `{ id }`                                                                                                  | `{ ok: true }`                                         | 管理员；仅当无消耗记录            |
+| Procedure                | 入参                                                                                       | 返回                                                   | 权限                                           |
+| ------------------------ | ------------------------------------------------------------------------------------------ | ------------------------------------------------------ | ---------------------------------------------- |
+| `records.today`          | `{ matterId, subWarehouseId?, date? }`                                                     | `RecordDetailDto`（按子仓库+日期，不存在则创建）       | 登录（团队隔离）；不传子仓库取第一个启用子仓库 |
+| `records.list`           | `{ matterId?, subWarehouseId?, teamId?, period?, anchorDate?, status?, page?, pageSize? }` | `{ items: RecordSummaryDto[]; total; page; pageSize }` | 登录                                           |
+| `records.get`            | `{ id }`                                                                                   | `RecordDetailDto`                                      | 登录                                           |
+| `records.accept`         | `{ id, items: { itemId, checked, actualQty?, note? }[], note? }`                           | `RecordDetailDto`                                      | 登录；状态必须 pending_acceptance              |
+| `records.submitHandover` | `{ id, items: { itemId, checked, actualQty?, note? }[], note? }`                           | `RecordDetailDto`                                      | 登录；状态必须 accepted                        |
+| `records.remove`         | `{ id }`                                                                                   | `{ ok: true }`                                         | 管理员；仅当无消耗记录                         |
 
-验收规则：清单中每一项都必须出现在入参且 `checked=true`；实盘数与应有数不一致时必须填写该行 note。差异只写入清单，不自动创建异常；用户需通过 `exceptions.create` 提交异常上报后，`usage.create` 才会放行。
+验收规则：清单中每一项都必须出现在入参且 `checked=true`；实盘数与应有数不一致时必须填写该行 note。差异只写入清单，不自动创建异常；用户需通过 `exceptions.create` 提交异常上报后，`usage.create` 与 `records.submitHandover` 才会放行。
+
+交班规则：接班验收有差异且记录无异常上报时，`records.submitHandover` 返回 `CONFLICT`；权限 `canHandover=false`。
 
 ### 4.7 usage（用物消耗）
 
-> 流程门禁：`usage.create` 要求 `usedAt` 当日存在交接记录且状态为 accepted / handover_submitted；若验收存在数量差异（`actualQty != expectedQty`）且该记录没有任何异常事件，返回 `CONFLICT`，提示先提交异常上报。
+> 流程门禁：`usage.create` 要求 `subWarehouseId + usedAt` 存在交接记录且状态为 accepted（已交班不可再普通登记）；若验收存在数量差异且该记录没有任何异常事件，返回 `CONFLICT`。
+> `usage.backfill` 是独立补登记入口：登录即可，不要求交接记录/接班状态；必须提供 `usedAt`、`usedTime`（HH:mm）、`backfillReason`（2–300 字）与物品数量；不允许未来日期；扣减来源物品库存。
 
-| Procedure              | 入参                                                                                                                            | 返回                                  | 权限                                                                                |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- | ----------------------------------------------------------------------------------- |
-| `usage.list`           | `{ matterId?, teamId?, from?, to?, status?, page?, pageSize? }`                                                                 | 分页 `UsageDto[]`                     | 登录（团队隔离）                                                                    |
-| `usage.get`            | `{ id }`                                                                                                                        | `UsageDto`                            | 登录                                                                                |
-| `usage.create`         | `{ matterId, usedAt, patientName, patientType, patientNo, patientPhone?, operatorName?, note?, items: { itemId, quantity }[] }` | `UsageDto`                            | 登录；事务扣库存。前置：该日期记录已确认接收；若验收有差异且无异常上报则 `CONFLICT` |
-| `usage.requestRevoke`  | `{ id, reason }`                                                                                                                | `RevokeRequestDto`                    | 记录所属团队成员                                                                    |
-| `usage.pendingRevokes` | `{ teamId? }`                                                                                                                   | `RevokeRequestDto[]`（含 usage 摘要） | 管理员                                                                              |
-| `usage.reviewRevoke`   | `{ requestId, approve, note? }`                                                                                                 | `UsageDto`                            | 管理员；通过则恢复库存并置 revoked；驳回则 usage 恢复 active、申请置 rejected       |
+| Procedure              | 入参                                                                                                                     | 返回                                  | 权限                                                                          |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------- | ----------------------------------------------------------------------------- |
+| `usage.list`           | `{ matterId?, subWarehouseId?, teamId?, from?, to?, status?, page?, pageSize? }`                                         | 分页 `UsageDto[]`                     | 登录（团队隔离）                                                              |
+| `usage.get`            | `{ id }`                                                                                                                 | `UsageDto`                            | 登录                                                                          |
+| `usage.create`         | `{ matterId, subWarehouseId?, usedAt, patientName, patientType, patientNo, patientPhone?, operatorName?, note?, items }` | `UsageDto`                            | 登录；事务扣来源库存。前置：子仓库当日记录已接收；有差异需先异常上报          |
+| `usage.backfill`       | `{ matterId, subWarehouseId?, usedAt, usedTime, backfillReason, patient..., items }`                                     | `UsageDto`（`isBackfill=true`）       | 登录；不受接班门禁限制；时间/数量/原因必填；禁止未来日期                      |
+| `usage.requestRevoke`  | `{ id, reason }`                                                                                                         | `RevokeRequestDto`                    | 记录所属团队成员                                                              |
+| `usage.pendingRevokes` | `{ teamId? }`                                                                                                            | `RevokeRequestDto[]`（含 usage 摘要） | 管理员                                                                        |
+| `usage.reviewRevoke`   | `{ requestId, approve, note? }`                                                                                          | `UsageDto`                            | 管理员；通过则恢复库存并置 revoked；驳回则 usage 恢复 active、申请置 rejected |
 
 ### 4.8 exceptions
 
