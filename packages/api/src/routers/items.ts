@@ -435,7 +435,11 @@ export const itemsRouter = {
         });
       }
 
-      context.db.delete(item).where(eq(item.id, input.id)).run();
+      context.db.transaction((tx) => {
+        // 图片表也有级联删除，这里显式清理，确保任何 SQLite 配置下都不留孤儿图片。
+        tx.delete(itemImage).where(eq(itemImage.itemId, input.id)).run();
+        tx.delete(item).where(eq(item.id, input.id)).run();
+      });
 
       return { ok: true as const };
     }),

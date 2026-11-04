@@ -33,13 +33,24 @@ const businessSection: AppNavSection = {
   ],
 };
 
+/** 管理员的业务导航：在交接记录上方增加交接事项管理入口。 */
+const adminBusinessSection: AppNavSection = {
+  label: "业务",
+  items: [
+    { icon: LayoutDashboardIcon, label: "工作台", path: "/" },
+    { icon: QrCodeIcon, label: "交接事项", path: "/admin/matters" },
+    { icon: ClipboardListIcon, label: "交接记录", path: "/records" },
+    { icon: BoxesIcon, label: "用物消耗", path: "/usage" },
+    { icon: QrCodeIcon, label: "扫码入口", path: "/scan" },
+  ],
+};
+
 /** 管理端页面由 frontend-admin 实现；这里只约定导航路径，扩展时改这一处。 */
 const adminSection: AppNavSection = {
   label: "管理",
   items: [
     { icon: BoxesIcon, label: "物品库存", path: "/admin/items" },
     { icon: BarChart3Icon, label: "数据统计", path: "/admin/stats" },
-    { icon: QrCodeIcon, label: "事项二维码", path: "/admin/matters" },
   ],
 };
 
@@ -58,6 +69,7 @@ const usersSection: AppNavSection = {
 
 const allItems = [
   ...businessSection.items,
+  ...adminBusinessSection.items,
   ...adminSection.items,
   ...platformSection.items,
 ];
@@ -68,10 +80,10 @@ export const navSectionsForRole = (role: AppRole): AppNavSection[] => {
   }
 
   if (role === "super_admin") {
-    return [businessSection, adminSection, platformSection];
+    return [adminBusinessSection, adminSection, platformSection];
   }
 
-  return [businessSection, adminSection, usersSection];
+  return [adminBusinessSection, adminSection, usersSection];
 };
 
 export const navItemMatches = (path: string, pathname: string): boolean =>

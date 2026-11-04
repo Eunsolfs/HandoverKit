@@ -1,5 +1,8 @@
+import { eq } from "drizzle-orm";
 import Jimp from "jimp";
 import { describe, expect, it } from "vite-plus/test";
+
+import { itemImage } from "@handoverkit/db/schema/handover";
 
 import { createClient, createTestUser, db } from "../support/api.ts";
 import {
@@ -336,5 +339,36 @@ describe("items", () => {
 
     const removed = await teamAdmin.client.items.removeImage({ id: item.id });
     expect(removed.imageUrl).toBeNull();
+  });
+
+  it("彻底删除物品时同步清理产品图", async () => {
+    const { matter, teamAdmin } = await setup();
+
+    const item = await teamAdmin.client.items.create({
+      matterId: matter.id,
+      name: "待删除带图物品",
+      stock: 0,
+      unit: "个",
+    });
+
+    const source = new Jimp(100, 100, 0x22_aa_88_ff);
+    const png = await source.getBufferAsync(Jimp.MIME_PNG);
+    await teamAdmin.client.items.uploadImage({
+      id: item.id,
+      imageData: `data:image/png;base64,${png.toString("base64")}`,
+    });
+
+    const countImages = () =>
+      db
+        .select({ value: itemImage.itemId })
+        .from(itemImage)
+        .where(eq(itemImage.itemId, item.id))
+        .all().length;
+
+    expect(countImages()).toBe(1);
+
+    await teamAdmin.client.items.remove({ id: item.id });
+
+    expect(countImages()).toBe(0);
   });
 });

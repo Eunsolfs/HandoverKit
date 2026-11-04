@@ -30,6 +30,7 @@ import { DataTable } from "#src/components/app/data-table.tsx";
 import type { DataTableColumn } from "#src/components/app/data-table.tsx";
 import { EmptyState } from "#src/components/app/empty-state.tsx";
 import { FormField } from "#src/components/app/form-field.tsx";
+import { ItemThumbnail } from "#src/components/app/item-thumbnail.tsx";
 import { PageHeader } from "#src/components/app/page-header.tsx";
 import { RoleGuard } from "#src/components/app/role-guard.tsx";
 import { StatusBadge } from "#src/components/app/status-badge.tsx";
@@ -125,11 +126,14 @@ const buildItemColumns = (
 ): DataTableColumn<ItemDto>[] => [
   {
     cell: (item) => (
-      <div className="grid gap-0.5">
-        <span className="font-medium">{item.name}</span>
-        <span className="text-muted-foreground text-xs">
-          {item.spec ?? "无规格"}
-        </span>
+      <div className="flex items-center gap-2.5">
+        <ItemThumbnail imageUrl={item.imageUrl} itemName={item.name} />
+        <div className="grid min-w-0 gap-0.5">
+          <span className="font-medium break-words">{item.name}</span>
+          <span className="text-muted-foreground text-xs">
+            {item.spec ?? "无规格"}
+          </span>
+        </div>
       </div>
     ),
     header: "物品",

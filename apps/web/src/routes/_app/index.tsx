@@ -322,7 +322,7 @@ const AdminEntryCard = ({ role }: { role: AppRole }) => (
         </ButtonLink>
         <ButtonLink href="/admin/matters" size="sm" variant="outline">
           <QrCodeIcon />
-          事项二维码
+          交接事项
         </ButtonLink>
         <ButtonLink href="/admin/users" size="sm" variant="outline">
           <UsersIcon />
