@@ -1,3 +1,10 @@
+## v1.1.2（2026-11-04）修复服务端 bundle 启动失败
+
+- 修复 v1.1.1 线上启动失败：Jimp 0.22 的 CJS 代码包含 `__dirname`，被打包进带顶层 await 的 ESM bundle 后，Node 24 报 `ERR_AMBIGUOUS_MODULE_SYNTAX`。
+- 在服务端打包配置中把 `__dirname` / `__filename` 映射为 `import.meta.dirname` / `import.meta.filename`。
+- 已用实际构建产物（非 dev server）验证：启动、登录、上传图片、读取图片、健康检查均正常。
+- 集成测试 71 条、E2E 4 条、完整门禁 6/6。
+
 ## v1.1.1（2026-11-04）交接事项导航与图片资源清理
 
 - 管理员侧边栏在「交接记录」上方新增「交接事项」（`/admin/matters`），超级管理员与团队管理员均可见；原「管理 → 事项二维码」重复入口移除。

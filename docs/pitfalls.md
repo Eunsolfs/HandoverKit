@@ -158,3 +158,9 @@
 
 - 现象：把本机 `apps/server/dist` 复制进旧镜像做热更新时，`dist/migrations` 可能同时保留旧版与新版迁移目录；演示库只记录新版迁移，`migrate` 会先执行旧迁移并报 `table already exists`。
 - 处理：复制前清理 `apps/server/dist/migrations` 下的旧目录，或构建只含当前迁移的干净镜像；全新数据卷可用 `docker compose down -v` 后重新迁移验证。正式 Docker 构建从干净上下文复制迁移，不会带入宿主机 `dist`。
+
+### 25. Jimp 打入 ESM bundle 后 Node 启动失败
+
+- 现象：升级后容器反复重启，日志报 `ERR_AMBIGUOUS_MODULE_SYNTAX`，指向 Jimp 内部的 `__dirname` 与顶层 await 并存。
+- 原因：Jimp 0.22 为 CommonJS，内部使用 `__dirname`；服务端打包为 ESM 且包含顶层 await，Node 24 拒绝加载。
+- 处理：服务端 `vite.config.ts` 的 `pack.define` 将 `__dirname` 映射为 `import.meta.dirname`、`__filename` 映射为 `import.meta.filename`。发布前必须用构建产物实际启动一次，不能只依赖 dev server。
