@@ -51,6 +51,11 @@ const platformSection: AppNavSection = {
   ],
 };
 
+const usersSection: AppNavSection = {
+  label: "系统",
+  items: [{ icon: UsersIcon, label: "用户管理", path: "/admin/users" }],
+};
+
 const allItems = [
   ...businessSection.items,
   ...adminSection.items,
@@ -66,7 +71,7 @@ export const navSectionsForRole = (role: AppRole): AppNavSection[] => {
     return [businessSection, adminSection, platformSection];
   }
 
-  return [businessSection, adminSection];
+  return [businessSection, adminSection, usersSection];
 };
 
 export const navItemMatches = (path: string, pathname: string): boolean =>

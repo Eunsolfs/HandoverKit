@@ -9,6 +9,7 @@ import {
   PlusIcon,
   QrCodeIcon,
   SparklesIcon,
+  UsersIcon,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -322,6 +323,10 @@ const AdminEntryCard = ({ role }: { role: AppRole }) => (
         <ButtonLink href="/admin/matters" size="sm" variant="outline">
           <QrCodeIcon />
           事项二维码
+        </ButtonLink>
+        <ButtonLink href="/admin/users" size="sm" variant="outline">
+          <UsersIcon />
+          用户管理
         </ButtonLink>
         {role === "super_admin" ? (
           <ButtonLink href="/admin/teams" size="sm" variant="outline">
