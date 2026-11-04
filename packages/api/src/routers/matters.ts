@@ -1,19 +1,24 @@
 import { randomBytes, randomUUID } from "node:crypto";
 
 import { ORPCError } from "@orpc/server";
-import { and, eq, ne, sql } from "drizzle-orm";
+import { and, count, eq, inArray, ne, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import type { Database } from "@handoverkit/db";
-import { item, matter, subWarehouse } from "@handoverkit/db/schema/handover";
+import {
+  handoverRecord,
+  item,
+  matter,
+  subWarehouse,
+} from "@handoverkit/db/schema/handover";
 
 import {
   assertMatterAccess,
   assertTeamAccess,
   resolveTeamId,
 } from "#src/authz.ts";
-import { toItemDto, toSubWarehouseDto } from "#src/dto.ts";
-import type { MatterDto } from "#src/dto.ts";
+import { toItemDto, toRecordStatus, toSubWarehouseDto } from "#src/dto.ts";
+import type { MatterDto, SubWarehouseTodayStatusDto } from "#src/dto.ts";
 import { todayInTimeZone } from "#src/lib/dates.ts";
 import {
   loadMatterDto,
@@ -358,6 +363,114 @@ export const mattersRouter = {
 
       return loadMatterDtos(context.db, rows, recordDate);
     }),
+
+  todayStatuses: protectedProcedure
+    .input(z.object({ teamId: z.string().min(1).optional() }))
+    .handler(
+      async ({ context, input }): Promise<SubWarehouseTodayStatusDto[]> => {
+        const teamId = await resolveTeamId(
+          context.db,
+          context.user,
+          input.teamId
+        );
+
+        const teamRow = loadTeamRow(context.db, teamId);
+
+        const recordDate = todayInTimeZone(
+          teamRow?.timezone ?? "Asia/Shanghai"
+        );
+
+        const matterRows = context.db
+          .select()
+          .from(matter)
+          .where(and(eq(matter.teamId, teamId), eq(matter.status, "active")))
+          .orderBy(matter.createdAt)
+          .all();
+
+        const matterIds = matterRows.map((row) => row.id);
+
+        if (matterIds.length === 0) {
+          return [];
+        }
+
+        const warehouseRows = context.db
+          .select()
+          .from(subWarehouse)
+          .where(
+            and(
+              inArray(subWarehouse.matterId, matterIds),
+              eq(subWarehouse.status, "active")
+            )
+          )
+          .orderBy(subWarehouse.sortOrder, subWarehouse.createdAt)
+          .all();
+
+        const warehouseIds = warehouseRows.map((row) => row.id);
+
+        if (warehouseIds.length === 0) {
+          return [];
+        }
+
+        const recordRows = context.db
+          .select({
+            id: handoverRecord.id,
+            status: handoverRecord.status,
+            subWarehouseId: handoverRecord.subWarehouseId,
+          })
+          .from(handoverRecord)
+          .where(
+            and(
+              inArray(handoverRecord.subWarehouseId, warehouseIds),
+              eq(handoverRecord.recordDate, recordDate)
+            )
+          )
+          .all();
+
+        const recordByWarehouse = new Map(
+          recordRows.map((row) => [row.subWarehouseId, row])
+        );
+
+        const itemCountRows = context.db
+          .select({
+            subWarehouseId: item.subWarehouseId,
+            value: count(),
+          })
+          .from(item)
+          .where(
+            and(
+              inArray(item.subWarehouseId, warehouseIds),
+              eq(item.status, "active")
+            )
+          )
+          .groupBy(item.subWarehouseId)
+          .all();
+
+        const itemCountByWarehouse = new Map(
+          itemCountRows.map((row) => [row.subWarehouseId, row.value])
+        );
+
+        return matterRows.flatMap((matterRow) =>
+          warehouseRows
+            .filter((warehouse) => warehouse.matterId === matterRow.id)
+            .map((warehouse) => {
+              const record = recordByWarehouse.get(warehouse.id);
+
+              return {
+                itemCount: itemCountByWarehouse.get(warehouse.id) ?? 0,
+                matterCode: matterRow.code,
+                matterId: matterRow.id,
+                matterName: matterRow.name,
+                qrToken: matterRow.qrToken,
+                recordId: record?.id ?? null,
+                status:
+                  record === undefined ? null : toRecordStatus(record.status),
+                subWarehouseId: warehouse.id,
+                subWarehouseName: warehouse.name,
+              };
+            })
+        );
+      }
+    ),
 
   rotateQr: adminProcedure
     .input(z.object({ id: z.string().min(1) }))

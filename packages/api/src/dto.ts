@@ -285,6 +285,18 @@ export interface StockMovementDto {
   createdAt: number;
 }
 
+export interface SubWarehouseTodayStatusDto {
+  matterId: string;
+  matterName: string;
+  matterCode: string | null;
+  qrToken: string;
+  subWarehouseId: string;
+  subWarehouseName: string;
+  status: RecordStatus | null;
+  recordId: string | null;
+  itemCount: number;
+}
+
 export interface StockTransferDto {
   id: string;
   matterId: string;
@@ -311,6 +323,7 @@ export interface StatsOverviewDto {
     acceptedCount: number;
   };
   byItem: {
+    /** 物品档案合并键：名称 + 规格 + 单位。 */
     itemId: string;
     itemName: string;
     spec: string | null;
@@ -318,6 +331,13 @@ export interface StatsOverviewDto {
     quantity: number;
     usageCount: number;
     share: number;
+    /** 同一物品档案在各子仓库的消耗拆分，用于折叠展开。 */
+    subWarehouseBreakdown: {
+      subWarehouseId: string;
+      subWarehouseName: string;
+      quantity: number;
+      usageCount: number;
+    }[];
   }[];
   byDay: { date: string; quantity: number; usageCount: number }[];
   byPatientType: { outpatient: number; inpatient: number };

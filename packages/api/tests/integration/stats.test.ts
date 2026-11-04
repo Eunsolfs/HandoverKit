@@ -217,11 +217,11 @@ describe("stats", () => {
       period: "week",
     });
 
-    const byItem = new Map(overview.byItem.map((row) => [row.itemId, row]));
+    const byItem = new Map(overview.byItem.map((row) => [row.itemName, row]));
     expect({
-      gauze: byItem.get(gauze.id),
-      needle: byItem.get(needle.id),
-      tape: byItem.get(tape.id),
+      gauze: byItem.get(gauze.name),
+      needle: byItem.get(needle.name),
+      tape: byItem.get(tape.name),
     }).toMatchObject({
       gauze: { quantity: 5, share: 0.5556, usageCount: 2 },
       needle: { quantity: 2, share: 0.2222, usageCount: 1 },
@@ -321,5 +321,71 @@ describe("stats", () => {
       byItem: empty.byItem,
       quantity: empty.totals.quantity,
     }).toStrictEqual({ byDayZero: true, byItem: [], quantity: 0 });
+  });
+
+  it("同一物品档案跨子仓库合并，并保留子仓库拆分", async () => {
+    const { team, teamAdmin } = await setupTeam();
+    const matter = createMatterFixture(db, team.id);
+    const member = await createTestUser({ role: "member", teamId: team.id });
+
+    const mainItem = createItemFixture(db, matter.id, {
+      name: "血糖试纸",
+      spec: "50 片",
+      stock: 20,
+      unit: "盒",
+    });
+
+    const second = await teamAdmin.client.subWarehouses.create({
+      matterId: matter.id,
+      name: "住院仓库",
+    });
+
+    const secondItem = await teamAdmin.client.items.create({
+      name: "血糖试纸",
+      spec: "50 片",
+      stock: 20,
+      subWarehouseId: second.id,
+      unit: "盒",
+    });
+
+    await ensureAcceptedRecord(member.client, matter.id, "2026-05-06");
+
+    await member.client.usage.create({
+      items: [
+        { itemId: mainItem.id, quantity: 2 },
+        { itemId: secondItem.id, quantity: 3 },
+      ],
+      matterId: matter.id,
+      patientName: "合并统计患者",
+      patientNo: "S100",
+      patientType: "outpatient",
+      usedAt: "2026-05-06",
+    });
+
+    const overview = await teamAdmin.client.stats.overview({
+      anchorDate: "2026-05-06",
+      period: "week",
+    });
+
+    const row = overview.byItem.find((item) => item.itemName === "血糖试纸");
+
+    expect({
+      itemKinds: overview.totals.itemKinds,
+      quantity: row?.quantity,
+      breakdownCount: row?.subWarehouseBreakdown.length,
+      breakdownQuantity: row?.subWarehouseBreakdown.reduce(
+        (sum, entry) => sum + entry.quantity,
+        0
+      ),
+      breakdownNames: row?.subWarehouseBreakdown
+        .map((entry) => entry.subWarehouseName)
+        .toSorted(),
+    }).toStrictEqual({
+      itemKinds: 1,
+      quantity: 5,
+      breakdownCount: 2,
+      breakdownQuantity: 5,
+      breakdownNames: ["主仓库", "住院仓库"].toSorted(),
+    });
   });
 });

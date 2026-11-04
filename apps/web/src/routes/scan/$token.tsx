@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { z } from "zod";
 
 import {
   Alert,
@@ -701,10 +702,14 @@ const UsagePanel = ({
 
 const ScanPage = () => {
   const { token } = Route.useParams();
+  const search = Route.useSearch();
   const me = useMe();
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<ScanTab>(TAB_ACCEPT);
-  const [subWarehouseId, setSubWarehouseId] = useState<string | undefined>();
+
+  const [subWarehouseId, setSubWarehouseId] = useState<string | undefined>(
+    search.subWarehouseId
+  );
 
   // 二维码无效/事项归档属于 4xx，不应重试，避免长时间骨架屏后才显示错误
   const scanQuery = useQuery({
@@ -864,7 +869,12 @@ const ScanPage = () => {
   );
 };
 
+const scanSearchSchema = z.object({
+  subWarehouseId: z.string().min(1).optional(),
+});
+
 export const Route = createFileRoute("/scan/$token")({
+  validateSearch: scanSearchSchema,
   beforeLoad: ({ context, location }) => {
     if (!context.session) {
       throw redirect({ search: { redirect: location.href }, to: "/login" });

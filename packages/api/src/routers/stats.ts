@@ -8,6 +8,7 @@ import {
   item,
   matter,
   revokeRequest,
+  subWarehouse,
   usageItem,
   usageRecord,
 } from "@handoverkit/db/schema/handover";
@@ -148,6 +149,63 @@ const loadAlerts = (
   return { lowStockItems, openExceptions, pendingRevocations };
 };
 
+interface ItemUsageRow {
+  itemName: string;
+  itemSpec: string | null;
+  unit: string;
+  quantity: number;
+  usageCount: number;
+  subWarehouseId: string;
+  subWarehouseName: string;
+}
+
+const aggregateByItem = (rows: ItemUsageRow[]): StatsOverviewDto["byItem"] => {
+  const map = new Map<string, StatsOverviewDto["byItem"][number]>();
+
+  for (const row of rows) {
+    const key = `${row.itemName}\u0000${row.itemSpec ?? ""}\u0000${row.unit}`;
+    const existing = map.get(key);
+
+    if (existing === undefined) {
+      map.set(key, {
+        itemId: key,
+        itemName: row.itemName,
+        quantity: row.quantity,
+        share: 0,
+        spec: row.itemSpec,
+        subWarehouseBreakdown: [
+          {
+            quantity: row.quantity,
+            subWarehouseId: row.subWarehouseId,
+            subWarehouseName: row.subWarehouseName,
+            usageCount: row.usageCount,
+          },
+        ],
+        unit: row.unit,
+        usageCount: row.usageCount,
+      });
+    } else {
+      existing.quantity += row.quantity;
+      existing.usageCount += row.usageCount;
+      existing.subWarehouseBreakdown.push({
+        quantity: row.quantity,
+        subWarehouseId: row.subWarehouseId,
+        subWarehouseName: row.subWarehouseName,
+        usageCount: row.usageCount,
+      });
+    }
+  }
+
+  return [...map.values()]
+    .map((row) => ({
+      ...row,
+      subWarehouseBreakdown: row.subWarehouseBreakdown.toSorted(
+        (left, right) => right.quantity - left.quantity
+      ),
+    }))
+    .toSorted((left, right) => right.quantity - left.quantity);
+};
+
 export const statsRouter = {
   overview: adminProcedure
     .input(
@@ -202,17 +260,19 @@ export const statsRouter = {
 
       const byItemRows = context.db
         .select({
-          itemId: usageItem.itemId,
-          itemName: item.name,
+          itemName: usageItem.itemName,
+          itemSpec: usageItem.itemSpec,
           quantity: sumQuantity,
-          spec: item.spec,
-          unit: item.unit,
+          subWarehouseId: subWarehouse.id,
+          subWarehouseName: subWarehouse.name,
+          unit: usageItem.unit,
           usageCount: countUsages,
         })
         .from(usageRecord)
         .innerJoin(matter, eq(usageRecord.matterId, matter.id))
         .innerJoin(usageItem, eq(usageItem.usageId, usageRecord.id))
         .innerJoin(item, eq(item.id, usageItem.itemId))
+        .innerJoin(subWarehouse, eq(item.subWarehouseId, subWarehouse.id))
         .where(
           and(
             eq(matter.teamId, teamId),
@@ -224,9 +284,16 @@ export const statsRouter = {
               : [eq(usageRecord.matterId, input.matterId)])
           )
         )
-        .groupBy(usageItem.itemId, item.name, item.spec, item.unit)
+        .groupBy(
+          usageItem.itemName,
+          usageItem.itemSpec,
+          usageItem.unit,
+          subWarehouse.id
+        )
         .orderBy(desc(sql`sum(${usageItem.quantity})`))
         .all();
+
+      const byItem = aggregateByItem(byItemRows);
 
       const byDayRows = context.db
         .select({
@@ -285,14 +352,9 @@ export const statsRouter = {
         byDay: daysInRange(range).map(
           (date) => byDayMap.get(date) ?? { date, quantity: 0, usageCount: 0 }
         ),
-        byItem: byItemRows.map((row) => ({
-          itemId: row.itemId,
-          itemName: row.itemName,
-          quantity: row.quantity,
+        byItem: byItem.map((row) => ({
+          ...row,
           share: shareOf(row.quantity, totalQuantity),
-          spec: row.spec,
-          unit: row.unit,
-          usageCount: row.usageCount,
         })),
         byPatientType: patientTypeTotals(
           context.db,
@@ -303,7 +365,7 @@ export const statsRouter = {
         range: { end: range.end, period, start: range.start },
         totals: {
           acceptedCount,
-          itemKinds: totalsRow?.itemKinds ?? 0,
+          itemKinds: byItem.length,
           quantity: totalQuantity,
           recordCount,
           usageCount: totalsRow?.usageCount ?? 0,

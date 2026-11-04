@@ -375,6 +375,8 @@ interface StatsOverviewDto {
 | ---------------- | ---------------------------------------------------------------------- | ------------------ | ------ |
 | `stats.overview` | `{ teamId?, matterId?, period: "week"\|"month"\|"year", anchorDate? }` | `StatsOverviewDto` | 管理员 |
 
+`byItem` 按“物品名称 + 规格 + 单位”合并同一物品档案，并附带 `subWarehouseBreakdown`（子仓库、数量、使用次数）用于前端折叠展开；`totals.itemKinds` 为合并后的档案数。
+
 统计口径：统计 `status in ('active','revoke_pending')` 的消耗记录（待审批撤销未生效，仍计入；已批准撤销的 `revoked` 排除）；`quantity` 为物品件数合计；`byItem.share` 为数量占比（0-1，保留 4 位）；周期按团队时区自然周（周一至周日）/自然月/自然年。
 
 ## 5. 服务端权限实现约定

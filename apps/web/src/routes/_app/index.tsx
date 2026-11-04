@@ -41,6 +41,10 @@ type TeamSummary = NonNullable<
   Awaited<ReturnType<typeof api.me.get.call>>["team"]
 >;
 
+type TodayStatus = Awaited<
+  ReturnType<typeof api.matters.todayStatuses.call>
+>[number];
+
 interface QuickAction {
   title: string;
   description: string;
@@ -73,6 +77,7 @@ const countStatus = (matters: MatterSummary[], status: string): number =>
   matters.filter((matter) => matter.todayStatus === status).length;
 
 interface MetricCardsProps {
+  admin: boolean;
   matters: MatterSummary[];
   team: TeamSummary | null;
   today: string;
@@ -80,39 +85,60 @@ interface MetricCardsProps {
 }
 
 const MetricCards = ({
+  admin,
   matters,
   team,
   today,
   usageCount,
 }: MetricCardsProps) => (
   <div className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-4">
-    <StatCard
-      hint={team === null ? undefined : team.code}
-      icon={QrCodeIcon}
-      label="交接事项"
-      value={matters.length}
-    />
-    <StatCard
-      hint="今日待核对清单"
-      icon={ClipboardCheckIcon}
-      label="待接收"
-      tone="warning"
-      value={countStatus(matters, "pending_acceptance")}
-    />
-    <StatCard
-      hint="今日已提交交班表"
-      icon={FileCheck2Icon}
-      label="今日已交班"
-      tone="success"
-      value={countStatus(matters, "handover_submitted")}
-    />
-    <StatCard
-      hint={`今日 ${today}`}
-      icon={BoxesIcon}
-      label="今日用物记录"
-      tone="info"
-      value={usageCount}
-    />
+    <AppLink
+      className="focus-visible:ring-ring block rounded-xl focus-visible:ring-2 focus-visible:outline-none"
+      href={admin ? "/admin/matters" : "/records"}
+    >
+      <StatCard
+        hint={team === null ? undefined : team.code}
+        icon={QrCodeIcon}
+        label="交接事项"
+        value={matters.length}
+      />
+    </AppLink>
+    <AppLink
+      className="focus-visible:ring-ring block rounded-xl focus-visible:ring-2 focus-visible:outline-none"
+      href="/records"
+    >
+      <StatCard
+        hint="今日待核对清单"
+        icon={ClipboardCheckIcon}
+        label="待接收"
+        tone="warning"
+        value={countStatus(matters, "pending_acceptance")}
+      />
+    </AppLink>
+    <AppLink
+      className="focus-visible:ring-ring block rounded-xl focus-visible:ring-2 focus-visible:outline-none"
+      href="/records"
+    >
+      <StatCard
+        hint="今日已提交交班表"
+        icon={FileCheck2Icon}
+        label="今日已交班"
+        tone="success"
+        value={countStatus(matters, "handover_submitted")}
+      />
+    </AppLink>
+    <AppLink
+      className="focus-visible:ring-ring block rounded-xl focus-visible:ring-2 focus-visible:outline-none"
+      href="/usage"
+    >
+      <StatCard
+        hint={`今日 ${today}`}
+        icon={BoxesIcon}
+        label="今日用物记录"
+        tone="info"
+        value={usageCount}
+      />
+    </AppLink>
   </div>
 );
 
@@ -192,6 +218,57 @@ const TodayCard = ({ admin, matters, teamName }: TodayCardProps) => (
   </Card>
 );
 
+const SubWarehouseTodayCard = ({ statuses }: { statuses: TodayStatus[] }) => (
+  <Card>
+    <CardHeader>
+      <CardTitle>子仓库今日状态</CardTitle>
+      <CardDescription>
+        按门诊 / 住院等子仓库查看今日清点与交班进度，点击卡片进入扫码页
+      </CardDescription>
+    </CardHeader>
+    <CardContent>
+      {statuses.length === 0 ? (
+        <EmptyState
+          description="当前团队还没有启用中的子仓库。"
+          title="暂无子仓库状态"
+        />
+      ) : (
+        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+          {statuses.map((status) => (
+            <AppLink
+              className="focus-visible:ring-ring hover:bg-accent/60 flex flex-col gap-1 rounded-lg border p-3 transition-colors focus-visible:ring-2 focus-visible:outline-none"
+              href={`/scan/${status.qrToken}?subWarehouseId=${encodeURIComponent(status.subWarehouseId)}`}
+              key={status.subWarehouseId}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-muted-foreground truncate text-xs">
+                  {status.matterName}
+                  {status.matterCode === null ? "" : ` · ${status.matterCode}`}
+                </span>
+                {status.status === null ? (
+                  <StatusBadge
+                    label="未开始"
+                    status="pending_acceptance"
+                    tone="neutral"
+                  />
+                ) : (
+                  <StatusBadge status={status.status} />
+                )}
+              </div>
+              <span className="truncate text-sm font-medium">
+                {status.subWarehouseName}
+              </span>
+              <span className="text-muted-foreground text-xs">
+                {status.itemCount} 种物品 · 点击进入扫码页
+              </span>
+            </AppLink>
+          ))}
+        </div>
+      )}
+    </CardContent>
+  </Card>
+);
+
 const QuickActionsCard = () => (
   <Card>
     <CardHeader>
@@ -266,6 +343,13 @@ const WorkbenchPage = () => {
 
   const mattersQuery = useQuery({
     ...api.matters.list.queryOptions({
+      input: { teamId: teamId ?? undefined },
+    }),
+    enabled: queriesEnabled,
+  });
+
+  const todayStatusesQuery = useQuery({
+    ...api.matters.todayStatuses.queryOptions({
       input: { teamId: teamId ?? undefined },
     }),
     enabled: queriesEnabled,
@@ -358,11 +442,13 @@ const WorkbenchPage = () => {
       ) : (
         <>
           <MetricCards
+            admin={admin}
             matters={matters}
             team={team}
             today={today}
             usageCount={usageTodayCount}
           />
+          <SubWarehouseTodayCard statuses={todayStatusesQuery.data ?? []} />
           <div className="grid gap-4 lg:grid-cols-3">
             <TodayCard
               admin={admin}

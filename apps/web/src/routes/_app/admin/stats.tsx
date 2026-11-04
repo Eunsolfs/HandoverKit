@@ -100,6 +100,30 @@ const STATS_COLUMNS: DataTableColumn<StatsOverviewDto["byItem"][number]>[] = [
     header: "占比",
     key: "share",
   },
+  {
+    cell: (item) => (
+      <details className="group">
+        <summary className="text-primary focus-visible:ring-ring cursor-pointer list-none rounded-sm text-xs font-medium hover:underline focus-visible:ring-2 focus-visible:outline-none">
+          子仓库拆分（{item.subWarehouseBreakdown.length}）
+        </summary>
+        <ul className="text-muted-foreground mt-1.5 grid gap-1 text-xs">
+          {item.subWarehouseBreakdown.map((row) => (
+            <li
+              className="flex items-baseline justify-between gap-2"
+              key={row.subWarehouseId}
+            >
+              <span>{row.subWarehouseName}</span>
+              <span className="tabular-nums">
+                {row.quantity} {item.unit} · {row.usageCount} 次
+              </span>
+            </li>
+          ))}
+        </ul>
+      </details>
+    ),
+    header: "子仓库明细",
+    key: "subWarehouses",
+  },
 ];
 
 const shiftAnchor = (
@@ -401,7 +425,8 @@ const StatsPageContent = () => {
         <CardHeader>
           <CardTitle>消耗明细</CardTitle>
           <CardDescription>
-            物品、规格、单位、消耗数量、使用次数与占比
+            按物品档案（名称 + 规格 +
+            单位）合并；展开“子仓库拆分”查看各子仓库消耗数量与次数
           </CardDescription>
         </CardHeader>
         <CardContent>

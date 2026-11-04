@@ -298,4 +298,59 @@ describe("matters", () => {
     const detail = await member.client.records.get({ id: record.id });
     expect(detail.usages.map((row) => row.id)).toContain(usage.id);
   });
+
+  it("按子仓库返回今日状态卡片数据", async () => {
+    const team = createTeamFixture(db);
+
+    const teamAdmin = await createTestUser({
+      role: "team_admin",
+      teamId: team.id,
+    });
+
+    const member = await createTestUser({ role: "member", teamId: team.id });
+    const matter = createMatterFixture(db, team.id, { name: "状态事项" });
+
+    createItemFixture(db, matter.id, { stock: 5, unit: "个" });
+
+    const second = await teamAdmin.client.subWarehouses.create({
+      matterId: matter.id,
+      name: "住院仓库",
+    });
+
+    await teamAdmin.client.items.create({
+      name: "住院物品",
+      stock: 3,
+      subWarehouseId: second.id,
+      unit: "个",
+    });
+
+    const todayRecord = await member.client.records.today({
+      matterId: matter.id,
+    });
+
+    await member.client.records.accept({
+      id: todayRecord.id,
+      items: todayRecord.items.map((item) => ({
+        actualQty: item.expectedQty,
+        checked: true,
+        itemId: item.itemId,
+      })),
+    });
+
+    const statuses = await member.client.matters.todayStatuses({});
+    const rows = statuses.filter((row) => row.matterId === matter.id);
+
+    expect(
+      rows
+        .map((row) => ({
+          itemCount: row.itemCount,
+          name: row.subWarehouseName,
+          status: row.status,
+        }))
+        .toSorted((left, right) => left.name.localeCompare(right.name))
+    ).toStrictEqual([
+      { itemCount: 1, name: "主仓库", status: "accepted" },
+      { itemCount: 1, name: "住院仓库", status: null },
+    ]);
+  });
 });
