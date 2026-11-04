@@ -32,10 +32,8 @@ interface UserUpdateInput {
 
 const passwordSchema = z
   .string()
-  .min(8, "密码至少 8 位")
-  .max(128, "密码最多 128 位")
-  .regex(/[a-zA-Z]/u, "密码需包含字母")
-  .regex(/[0-9]/u, "密码需包含数字");
+  .min(4, "密码至少 4 位")
+  .max(128, "密码最多 128 位");
 
 const usernameSchema = z
   .string()

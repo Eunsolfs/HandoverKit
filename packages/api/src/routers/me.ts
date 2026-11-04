@@ -86,12 +86,7 @@ export const meRouter = {
     .input(
       z.object({
         currentPassword: z.string().min(1).max(128),
-        newPassword: z
-          .string()
-          .min(8)
-          .max(128)
-          .regex(/[a-zA-Z]/u, "密码需包含字母")
-          .regex(/[0-9]/u, "密码需包含数字"),
+        newPassword: z.string().min(4).max(128),
       })
     )
     .handler(async ({ context, input }) => {

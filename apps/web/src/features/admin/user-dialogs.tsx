@@ -709,7 +709,7 @@ export const ResetPasswordDialog = ({
 
           <FormField
             error={errors.password}
-            hint="至少 8 位，需同时包含字母和数字"
+            hint="至少 4 位"
             id="reset-user-password"
             label="新密码"
             required

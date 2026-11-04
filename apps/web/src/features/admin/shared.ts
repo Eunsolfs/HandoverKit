@@ -52,17 +52,8 @@ export const useAdminTeamId = (): string | null => {
   return activeTeamId ?? me.data?.user.teamId ?? null;
 };
 
-export const validatePassword = (value: string): string | null => {
-  if (value.length < 8) {
-    return "密码至少 8 位";
-  }
-
-  if (!/[a-zA-Z]/u.test(value) || !/[0-9]/u.test(value)) {
-    return "密码需同时包含字母和数字";
-  }
-
-  return null;
-};
+export const validatePassword = (value: string): string | null =>
+  value.length < 4 ? "密码至少 4 位" : null;
 
 export const validateUsername = (value: string): string | null => {
   const trimmed = value.trim();

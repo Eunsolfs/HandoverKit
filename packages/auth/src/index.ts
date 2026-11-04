@@ -25,7 +25,7 @@ export const createAuth = ({ db, baseURL, secret }: AuthOptions) =>
     emailAndPassword: {
       enabled: true,
       disableSignUp: true,
-      minPasswordLength: 8,
+      minPasswordLength: 4,
       maxPasswordLength: 128,
     },
     plugins: [

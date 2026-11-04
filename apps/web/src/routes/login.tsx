@@ -90,8 +90,8 @@ const LoginPage = () => {
       nextErrors.username = "登录名至少 3 个字符";
     }
 
-    if (password.length < 8) {
-      nextErrors.password = "密码至少 8 位";
+    if (password.length < 4) {
+      nextErrors.password = "密码至少 4 位";
     }
 
     if (captchaAnswer.trim().length === 0) {

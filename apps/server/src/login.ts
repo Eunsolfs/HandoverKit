@@ -48,7 +48,7 @@ const recordFailure = (ip: string) => {
 const loginSchema = z.object({
   captchaAnswer: z.string().trim().min(1).max(10),
   captchaId: z.string().min(1),
-  password: z.string().min(8).max(128),
+  password: z.string().min(4).max(128),
   username: z.string().trim().min(3).max(30),
 });
 

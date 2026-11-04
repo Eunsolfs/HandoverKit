@@ -88,7 +88,7 @@ describe("users", () => {
     expect(signedIn).toBeTruthy();
   });
 
-  it("登录名唯一（大小写不敏感）且密码/登录名格式受限", async () => {
+  it("登录名唯一（大小写不敏感）且密码长度与登录名格式受限", async () => {
     const admin = await createTestUser({ role: "super_admin" });
     const team = createTeamFixture(db);
     await admin.client.users.create({
@@ -112,12 +112,20 @@ describe("users", () => {
     const weakPassword = await captureOrpcError(
       admin.client.users.create({
         name: "弱密码",
-        password: "abcdefgh",
+        password: "abc",
         role: "member",
         teamId: team.id,
         username: "weakpass",
       })
     );
+
+    const fourChar = await admin.client.users.create({
+      name: "四位密码用户",
+      password: "a1b2",
+      role: "member",
+      teamId: team.id,
+      username: "shortpass",
+    });
 
     const badUsername = await captureOrpcError(
       admin.client.users.create({
@@ -129,9 +137,12 @@ describe("users", () => {
       })
     );
 
-    expect([duplicate.code, weakPassword.code, badUsername.code]).toStrictEqual(
-      ["CONFLICT", "BAD_REQUEST", "BAD_REQUEST"]
-    );
+    expect([
+      duplicate.code,
+      weakPassword.code,
+      badUsername.code,
+      Boolean(fourChar.id),
+    ]).toStrictEqual(["CONFLICT", "BAD_REQUEST", "BAD_REQUEST", true]);
   });
 
   it("团队管理员只能创建本团队普通成员", async () => {

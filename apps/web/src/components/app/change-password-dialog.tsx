@@ -75,10 +75,8 @@ export const ChangePasswordDialog = ({
       next.currentPassword = "请输入当前密码";
     }
 
-    if (newPassword.length < 8) {
-      next.newPassword = "新密码至少 8 位";
-    } else if (!/[a-zA-Z]/u.test(newPassword) || !/[0-9]/u.test(newPassword)) {
-      next.newPassword = "新密码需同时包含字母和数字";
+    if (newPassword.length < 4) {
+      next.newPassword = "新密码至少 4 位";
     }
 
     if (confirmPassword !== newPassword) {
@@ -95,9 +93,7 @@ export const ChangePasswordDialog = ({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>修改密码</DialogTitle>
-          <DialogDescription>
-            新密码至少 8 位，且需同时包含字母和数字。
-          </DialogDescription>
+          <DialogDescription>新密码至少 4 位。</DialogDescription>
         </DialogHeader>
         <form
           className="flex flex-col gap-3"
