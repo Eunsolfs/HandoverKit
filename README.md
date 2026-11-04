@@ -120,17 +120,17 @@ docker compose up -d --build
 
 ## 文档
 
-| 文档                                     | 内容                                             |
-| ---------------------------------------- | ------------------------------------------------ |
-| [需求规格](docs/requirements.md)         | 角色权限矩阵、业务流程、FR-01..FR-11、非功能需求 |
-| [数据模型](docs/data-model.md)           | ER 图、表结构、不变量与事务、索引                |
-| [API 契约](docs/api-contract.md)         | 认证接口、DTO、oRPC procedures、错误码、权限     |
-| [架构设计](docs/architecture.md)         | 技术栈、请求链路、安全模型、扩展点               |
-| [设计系统](docs/design-system.md)        | 色彩/字体/布局/组件/页面模式/无障碍              |
-| [开发规划](docs/dev-plan.md)             | 里程碑、分工、写作用域、风险                     |
-| [1Panel 部署](docs/deployment-1panel.md) | Compose、反向代理、备份、升级                    |
-| [避坑记录](docs/pitfalls.md)             | 环境、Drizzle、Better Auth、Windows 等真实踩坑   |
-| [更新日志](CHANGELOG.md)                 | 版本与里程碑变更                                 |
+| 文档                                     | 内容                                              |
+| ---------------------------------------- | ------------------------------------------------- |
+| [需求规格](docs/requirements.md)         | 角色权限矩阵、业务流程、FR-01..FR-11、非功能需求  |
+| [数据模型](docs/data-model.md)           | ER 图、表结构、不变量与事务、索引                 |
+| [API 契约](docs/api-contract.md)         | 认证接口、DTO、oRPC procedures、错误码、权限      |
+| [架构设计](docs/architecture.md)         | 技术栈、请求链路、安全模型、扩展点                |
+| [设计系统](docs/design-system.md)        | 色彩/字体/布局/组件/页面模式/无障碍               |
+| [开发规划](docs/dev-plan.md)             | 里程碑、分工、写作用域、风险                      |
+| [1Panel 部署](docs/deployment-1panel.md) | v1.0.0 一键安装、反向代理/HTTPS、备份、升级、排查 |
+| [避坑记录](docs/pitfalls.md)             | 环境、Drizzle、Better Auth、Windows 等真实踩坑    |
+| [更新日志](CHANGELOG.md)                 | 版本与里程碑变更                                  |
 
 ## 项目结构
 

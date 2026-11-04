@@ -142,15 +142,16 @@ jobs:
           cp deploy/env.release.example release/env.example
           cp scripts/ops.sh release/handoverkit-ops.sh
           cp docs/release-and-ops.md release/DEPLOY.md
+          cp docs/deployment-1panel.md release/1PANEL.md
           chmod +x release/handoverkit-ops.sh
 
           # 把默认镜像 tag 固定成本次发布版本，避免 latest 漂移
           sed -i "s/^DEFAULT_IMAGE_TAG=.*/DEFAULT_IMAGE_TAG=\"${version}\"/" release/handoverkit-ops.sh
           sed -i "s/:latest/:${version}/g" release/env.example
 
-          tar -czf "release/handoverkit-deploy-${version}.tar.gz" -C release docker-compose.yml env.example handoverkit-ops.sh DEPLOY.md
+          tar -czf "release/handoverkit-deploy-${version}.tar.gz" -C release docker-compose.yml env.example handoverkit-ops.sh DEPLOY.md 1PANEL.md
           cd release
-          sha256sum docker-compose.yml env.example handoverkit-ops.sh DEPLOY.md "handoverkit-deploy-${version}.tar.gz" > checksums.txt
+          sha256sum docker-compose.yml env.example handoverkit-ops.sh DEPLOY.md 1PANEL.md "handoverkit-deploy-${version}.tar.gz" > checksums.txt
           ls -la
 
       - name: 创建 GitHub Release
@@ -193,5 +194,6 @@ jobs:
             release/docker-compose.yml
             release/env.example
             release/DEPLOY.md
+            release/1PANEL.md
             release/handoverkit-deploy-*.tar.gz
             release/checksums.txt

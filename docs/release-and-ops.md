@@ -17,7 +17,7 @@ git tag v1.0.0 && git push origin v1.0.0
 ```
 
 - **触发**：push tag（`v*`）；或在 Actions 页面手动运行（填写已存在的 tag，可选 amd64/arm64）。
-- **质量门禁**：`vp check`（格式/lint/类型）、`knip`、`vp test`（57 个集成测试）全部通过才继续。
+- **质量门禁**：`vp check`（格式/lint/类型）、`knip`、`vp test`（69 个集成测试）全部通过才继续。
 - **镜像**：多阶段 Dockerfile 构建，推送到 `ghcr.io/<owner>/handoverkit`，标签为 tag 名、语义版本与 latest；附带 SBOM 与 provenance。
 - **Release 资产**：
   - `handoverkit-ops.sh`：一键安装/运维脚本（脚本内默认镜像 tag 固定为本次发布版本）
@@ -30,9 +30,9 @@ git tag v1.0.0 && git push origin v1.0.0
 ### 首次发布前检查
 
 1. 仓库 Settings → Actions → General → Workflow permissions：允许 workflow 写仓库内容（Release）。
-2. GHCR 包默认私有：安装服务器需要能拉取。二选一：
-   - 把 package 设为 **public**（推荐给单机自用）；
-   - 或在服务器 `docker login ghcr.io -u <GitHub用户名>`（PAT 勾选 `read:packages`）。
+2. GHCR 包可见性：v1.0.0 起已设为 **public**，安装服务器可直接匿名拉取。若后续改为私有，需要：
+   - 在服务器 `docker login ghcr.io -u <GitHub用户名>`（PAT 勾选 `read:packages`）；
+   - 或重新把 package 设为 public。
 3. 本仓库默认构建 `linux/amd64`；需要 ARM 服务器时在手动运行里选 `linux/amd64,linux/arm64`（取决于基础镜像是否支持 arm64）。
 
 ## 2. 一键安装（推荐）
@@ -74,10 +74,17 @@ sudo HK_DIR=/opt/handoverkit \
 
 ### 安装后使用 1Panel 反向代理 + HTTPS
 
+详细步骤见 [1Panel 部署手册](deployment-1panel.md)。
+
 1. 1Panel → 网站 → 反向代理，指向 `http://127.0.0.1:8080`；
 2. 申请/上传证书并开启 HTTPS；
 3. 把 `/opt/handoverkit/.env` 中 `BETTER_AUTH_URL` 改为 `https://你的域名`；
-4. `sudo bash /opt/handoverkit/ops.sh restart`。
+4. 修改 env 后必须**重建容器**（`ops.sh restart` 不会重新读取 env）：
+
+```bash
+cd /opt/handoverkit
+sudo docker compose --env-file .env up -d --force-recreate app
+```
 
 ## 3. 运维命令
 
@@ -151,8 +158,8 @@ docker compose up -d
 
 | 现象                                   | 处理                                                                                                                      |
 | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `docker compose pull` 401/unauthorized | GHCR 包私有：`docker login ghcr.io` 或改为 public；检查 PAT 权限 `read:packages`                                          |
-| 登录 403 / Origin 不一致               | `.env` 的 `BETTER_AUTH_URL` 与实际访问地址不一致；修改后 restart                                                          |
+| `docker compose pull` 401/unauthorized | 镜像已 public；先 `docker logout ghcr.io` 再重试；若包被改回私有，执行 `docker login ghcr.io`（PAT `read:packages`）      |
+| 登录 403 / Origin 不一致               | `.env` 的 `BETTER_AUTH_URL` 与实际访问地址不一致；修改后 `docker compose up -d --force-recreate app`                      |
 | 健康检查失败                           | `ops.sh logs` 查看；常见为端口占用、数据库权限（/data 需可写）、迁移失败                                                  |
 | 端口被占用                             | 修改 `.env` 的 `APP_PORT` 后 `ops.sh restart`                                                                             |
 | 备份失败：应用未运行                   | 先 `ops.sh status`，确保 app 容器在运行                                                                                   |
