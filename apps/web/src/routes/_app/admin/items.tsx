@@ -58,6 +58,7 @@ interface ItemColumnHandlers {
   onMovements: (item: ItemDto) => void;
   onToggleStatus: (item: ItemDto) => void;
   onDelete: (item: ItemDto) => void;
+  onForceDelete: (item: ItemDto) => void;
 }
 
 const renderItemActions = (item: ItemDto, handlers: ItemColumnHandlers) => (
@@ -116,6 +117,14 @@ const renderItemActions = (item: ItemDto, handlers: ItemColumnHandlers) => (
         variant="destructive"
       >
         删除
+      </DropdownMenuItem>
+      <DropdownMenuItem
+        onClick={() => {
+          handlers.onForceDelete(item);
+        }}
+        variant="destructive"
+      >
+        彻底删除
       </DropdownMenuItem>
     </DropdownMenuContent>
   </DropdownMenu>
@@ -262,6 +271,10 @@ const ItemsPageContent = () => {
   const [statusItem, setStatusItem] = useState<ItemDto | null>(null);
   const [deletingItem, setDeletingItem] = useState<ItemDto | null>(null);
 
+  const [forceDeletingItem, setForceDeletingItem] = useState<ItemDto | null>(
+    null
+  );
+
   const rows = itemsQuery.data ?? [];
 
   const selectedMatter = matters.find(
@@ -275,6 +288,9 @@ const ItemsPageContent = () => {
     },
     onDelete: (item) => {
       setDeletingItem(item);
+    },
+    onForceDelete: (item) => {
+      setForceDeletingItem(item);
     },
     onEdit: (item) => {
       setEditingItem(item);
@@ -514,6 +530,18 @@ const ItemsPageContent = () => {
           onOpenChange={(next) => {
             if (!next) {
               setDeletingItem(null);
+            }
+          }}
+        />
+      )}
+
+      {forceDeletingItem === null ? null : (
+        <ItemDeleteConfirmDialog
+          force
+          item={forceDeletingItem}
+          onOpenChange={(next) => {
+            if (!next) {
+              setForceDeletingItem(null);
             }
           }}
         />

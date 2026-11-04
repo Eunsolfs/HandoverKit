@@ -2,9 +2,18 @@ import { eq } from "drizzle-orm";
 import Jimp from "jimp";
 import { describe, expect, it } from "vite-plus/test";
 
-import { itemImage } from "@handoverkit/db/schema/handover";
+import {
+  item as itemTable,
+  itemImage,
+  stockMovement,
+} from "@handoverkit/db/schema/handover";
 
-import { createClient, createTestUser, db } from "../support/api.ts";
+import {
+  createClient,
+  createTestUser,
+  db,
+  ensureAcceptedRecord,
+} from "../support/api.ts";
 import {
   captureOrpcError,
   createItemFixture,
@@ -286,6 +295,47 @@ describe("items", () => {
     expect(snapshotBlocked.code).toBe("CONFLICT");
   });
 
+  it("有消耗记录或交接快照时禁止彻底删除", async () => {
+    const { matter, member, teamAdmin } = await setup();
+
+    const consumedItem = await teamAdmin.client.items.create({
+      matterId: matter.id,
+      name: "已消耗物品",
+      stock: 5,
+      unit: "个",
+    });
+
+    const snapshotItem = await teamAdmin.client.items.create({
+      matterId: matter.id,
+      name: "清单快照物品",
+      stock: 0,
+      unit: "个",
+    });
+
+    await ensureAcceptedRecord(member.client, matter.id, "2026-07-10");
+
+    const snapshotBlocked = await captureOrpcError(
+      teamAdmin.client.items.forceRemove({ id: snapshotItem.id })
+    );
+
+    expect(snapshotBlocked.code).toBe("CONFLICT");
+
+    await member.client.usage.create({
+      items: [{ itemId: consumedItem.id, quantity: 1 }],
+      matterId: matter.id,
+      patientName: "测试患者",
+      patientNo: "P-FORCE-1",
+      patientType: "outpatient",
+      usedAt: "2026-07-10",
+    });
+
+    const usageBlocked = await captureOrpcError(
+      teamAdmin.client.items.forceRemove({ id: consumedItem.id })
+    );
+
+    expect(usageBlocked.code).toBe("CONFLICT");
+  });
+
   it("编辑物品不会直接修改库存", async () => {
     const { matter, teamAdmin } = await setup();
 
@@ -370,5 +420,49 @@ describe("items", () => {
     await teamAdmin.client.items.remove({ id: item.id });
 
     expect(countImages()).toBe(0);
+  });
+
+  it("有库存流水时允许彻底删除并清理流水/图片", async () => {
+    const { matter, teamAdmin } = await setup();
+
+    const created = await teamAdmin.client.items.create({
+      matterId: matter.id,
+      name: "彻底删除物品",
+      stock: 5,
+      unit: "个",
+    });
+
+    const source = new Jimp(100, 100, 0x22_aa_88_ff);
+    const png = await source.getBufferAsync(Jimp.MIME_PNG);
+    await teamAdmin.client.items.uploadImage({
+      id: created.id,
+      imageData: `data:image/png;base64,${png.toString("base64")}`,
+    });
+
+    const removed = await teamAdmin.client.items.forceRemove({
+      id: created.id,
+    });
+
+    expect(removed.ok).toBeTruthy();
+
+    const counts = {
+      images: db
+        .select({ id: itemImage.itemId })
+        .from(itemImage)
+        .where(eq(itemImage.itemId, created.id))
+        .all().length,
+      items: db
+        .select({ id: itemTable.id })
+        .from(itemTable)
+        .where(eq(itemTable.id, created.id))
+        .all().length,
+      movements: db
+        .select({ id: stockMovement.id })
+        .from(stockMovement)
+        .where(eq(stockMovement.itemId, created.id))
+        .all().length,
+    };
+
+    expect(counts).toStrictEqual({ images: 0, items: 0, movements: 0 });
   });
 });

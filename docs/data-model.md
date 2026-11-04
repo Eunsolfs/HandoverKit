@@ -237,10 +237,11 @@ Better Auth 负责会话与密码；业务字段直接加在同一张表。
 1. **库存非负**：任何扣减前校验 `stock - qty >= 0`，在同一事务内 `UPDATE ... SET stock = stock - qty WHERE id = ? AND stock >= qty`；影响行数为 0 则回滚并抛错。
 2. **消耗 = 扣减 + 流水 + 明细**：同一事务写入 usage_record、usage_item、stock_movement。
 3. **撤销 = 状态 + 恢复 + 流水**：审批通过时事务内把记录置 revoked、恢复库存、写 `revoke` 流水；重复审批拒绝。
-4. **交接快照不可变**：验收/交班只更新 checked/actual/时间戳，不改 expectedQty 与快照字段。
+4. **交接快照基本不可变**：验收/交班只更新 checked/actual/时间戳，不改 expectedQty 与快照字段。唯一例外是未交班清单（`pending_acceptance`、`accepted`）：管理员修改物品名称/规格/单位时同步这三个字段；一旦提交交班，快照不再随物品档案变化。
 5. **唯一当日记录**：并发下用 `INSERT ... ON CONFLICT DO NOTHING` 或捕获唯一冲突后重查。
 6. **审计快照**：所有记录保存操作人姓名快照，账号改名/停用后历史仍可读。
 7. **团队隔离**：所有查询必须带 `teamId`（通过 matter 关联或用户所属团队），越权返回 NOT_FOUND。
+8. **物品彻底删除**：仅当没有 `usage_item` 与 `handover_record_item` 时允许物理删除，并在同一事务内清理 `stock_movement`、`stock_transfer`（源/目标）与 `item_image`；否则只能停用。
 
 ## 4. 索引建议
 

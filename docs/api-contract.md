@@ -301,14 +301,14 @@ interface StatsOverviewDto {
 
 ### 4.4 matters（交接事项）
 
-| Procedure          | 入参                                          | 返回                                                                                                                   | 权限                                               |
-| ------------------ | --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
-| `matters.list`     | `{ teamId?, includeArchived? }`               | `MatterDto[]`                                                                                                          | 登录                                               |
-| `matters.create`   | `{ name, code?, description?, teamId? }`      | `MatterDto`                                                                                                            | 管理员                                             |
-| `matters.update`   | `{ id, name?, code?, description?, status? }` | `MatterDto`                                                                                                            | 管理员                                             |
-| `matters.rotateQr` | `{ id }`                                      | `{ qrToken, qrVersion }`                                                                                               | 管理员；生成新 token，旧码失效                     |
-| `matters.byToken`  | `{ token, subWarehouseId? }`                  | `{ matter; team; subWarehouses: SubWarehouseDto[]; selectedSubWarehouseId; today: RecordDetailDto; items: ItemDto[] }` | 登录且属于该团队；不传子仓库时默认第一个启用子仓库 |
-| `matters.archive`  | `{ id }`                                      | `MatterDto`                                                                                                            | 管理员（归档，不物理删除）                         |
+| Procedure          | 入参                                          | 返回                                                                                                                   | 权限                                                                                               |
+| ------------------ | --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `matters.list`     | `{ teamId?, includeArchived? }`               | `MatterDto[]`                                                                                                          | 登录                                                                                               |
+| `matters.create`   | `{ name, code?, description?, teamId? }`      | `MatterDto`                                                                                                            | 管理员                                                                                             |
+| `matters.update`   | `{ id, name?, code?, description?, status? }` | `MatterDto`                                                                                                            | 管理员                                                                                             |
+| `matters.rotateQr` | `{ id }`                                      | `{ qrToken, qrVersion }`                                                                                               | 管理员；生成新 token，旧码失效                                                                     |
+| `matters.byToken`  | `{ token, subWarehouseId? }`                  | `{ matter; team; subWarehouses: SubWarehouseDto[]; selectedSubWarehouseId; today: RecordDetailDto; items: ItemDto[] }` | 登录且属于该团队；不传子仓库时默认第一个启用子仓库；二维码可携带 `?subWarehouseId=` 直达指定子仓库 |
+| `matters.archive`  | `{ id }`                                      | `MatterDto`                                                                                                            | 管理员（归档，不物理删除）                                                                         |
 
 ### 4.4.1 subWarehouses（子仓库）
 
@@ -321,17 +321,18 @@ interface StatsOverviewDto {
 
 ### 4.5 items
 
-| Procedure         | 入参                                                                                                | 返回                                | 权限                                                                                       |
-| ----------------- | --------------------------------------------------------------------------------------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------ |
-| `items.list`      | `{ matterId? , subWarehouseId?, includeArchived? }`                                                 | `ItemDto[]`                         | 登录（团队隔离）；matterId 与 subWarehouseId 至少一个                                      |
-| `items.create`    | `{ subWarehouseId?, matterId?, name, spec?, unit, category?, stock?, minStock?, location?, note? }` | `ItemDto`                           | 管理员；不传子仓库时取事项第一个启用子仓库；stock>0 写 initial 流水                        |
-| `items.update`    | `{ id, name?, spec?, unit?, category?, minStock?, location?, note?, status? }`                      | `ItemDto`                           | 管理员（不允许直接改 stock）                                                               |
-| `items.inbound`   | `{ id, quantity, note? }`                                                                           | `ItemDto`                           | 管理员；库存 + quantity，写 inbound 流水                                                   |
-| `items.adjust`    | `{ id, quantityDelta, note }`                                                                       | `ItemDto`                           | 管理员；盘点/异常调整，reason 必填，写 adjustment 流水                                     |
-| `items.movements` | `{ itemId }`                                                                                        | `StockMovementDto[]`（最多 100 条） | 登录（团队隔离）                                                                           |
-| `items.remove`    | `{ id }`                                                                                            | `{ ok: true }`                      | 管理员；有 usage_item / stock_movement / handover_record_item 快照时只能停用（`CONFLICT`） |
-| `items.transfer`  | `{ fromSubWarehouseId, toSubWarehouseId, itemId, quantity, note? }`                                 | `StockTransferDto`                  | 管理员；同事项、不同子仓库、双边事务扣增；调入无同名同规格物品时自动建档                   |
-| `items.transfers` | `{ matterId, subWarehouseId? }`                                                                     | `StockTransferDto[]`（最近 50 条）  | 登录（团队隔离）                                                                           |
+| Procedure           | 入参                                                                                                | 返回                                | 权限                                                                                            |
+| ------------------- | --------------------------------------------------------------------------------------------------- | ----------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `items.list`        | `{ matterId? , subWarehouseId?, includeArchived? }`                                                 | `ItemDto[]`                         | 登录（团队隔离）；matterId 与 subWarehouseId 至少一个                                           |
+| `items.create`      | `{ subWarehouseId?, matterId?, name, spec?, unit, category?, stock?, minStock?, location?, note? }` | `ItemDto`                           | 管理员；不传子仓库时取事项第一个启用子仓库；stock>0 写 initial 流水                             |
+| `items.update`      | `{ id, name?, spec?, unit?, category?, minStock?, location?, note?, status? }`                      | `ItemDto`                           | 管理员（不允许直接改 stock）；名称/规格/单位变更会同步未交班清单快照                            |
+| `items.inbound`     | `{ id, quantity, note? }`                                                                           | `ItemDto`                           | 管理员；库存 + quantity，写 inbound 流水                                                        |
+| `items.adjust`      | `{ id, quantityDelta, note }`                                                                       | `ItemDto`                           | 管理员；盘点/异常调整，reason 必填，写 adjustment 流水                                          |
+| `items.movements`   | `{ itemId }`                                                                                        | `StockMovementDto[]`（最多 100 条） | 登录（团队隔离）                                                                                |
+| `items.remove`      | `{ id }`                                                                                            | `{ ok: true }`                      | 管理员；有 usage_item / stock_movement / handover_record_item 快照时只能停用（`CONFLICT`）      |
+| `items.forceRemove` | `{ id }`                                                                                            | `{ ok: true }`                      | 管理员；清理库存流水/调拨/图片后物理删除；有 usage_item 或 handover_record_item 时仍 `CONFLICT` |
+| `items.transfer`    | `{ fromSubWarehouseId, toSubWarehouseId, itemId, quantity, note? }`                                 | `StockTransferDto`                  | 管理员；同事项、不同子仓库、双边事务扣增；调入无同名同规格物品时自动建档                        |
+| `items.transfers`   | `{ matterId, subWarehouseId? }`                                                                     | `StockTransferDto[]`（最近 50 条）  | 登录（团队隔离）                                                                                |
 
 ### 4.6 records（交接记录）
 

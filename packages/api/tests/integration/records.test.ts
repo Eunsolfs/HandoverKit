@@ -569,4 +569,81 @@ describe("records", () => {
 
     expect(submitted.status).toBe("handover_submitted");
   });
+
+  it("未交班清单同步物品名称/规格/单位，已交班后不再同步", async () => {
+    const { gauze, matter, member, teamAdmin } = await setup();
+    const date = "2026-06-10";
+
+    const record = await member.client.records.today({
+      date,
+      matterId: matter.id,
+    });
+
+    await teamAdmin.client.items.update({
+      id: gauze.id,
+      name: "改名纱布",
+      spec: "10cm",
+      unit: "卷",
+    });
+
+    const pending = await member.client.records.get({ id: record.id });
+    const pendingItem = pending.items.find((row) => row.itemId === gauze.id);
+    expect({
+      itemName: pendingItem?.itemName,
+      spec: pendingItem?.itemSpec,
+      unit: pendingItem?.unit,
+    }).toStrictEqual({ itemName: "改名纱布", spec: "10cm", unit: "卷" });
+
+    await member.client.records.accept({
+      id: record.id,
+      items: pending.items.map((row) => ({
+        actualQty: row.expectedQty,
+        checked: true,
+        itemId: row.itemId,
+      })),
+    });
+
+    await teamAdmin.client.items.update({
+      id: gauze.id,
+      name: "再次改名",
+      spec: "20cm",
+      unit: "盒",
+    });
+
+    const accepted = await member.client.records.get({ id: record.id });
+    const acceptedItem = accepted.items.find((row) => row.itemId === gauze.id);
+    expect({
+      itemName: acceptedItem?.itemName,
+      spec: acceptedItem?.itemSpec,
+      unit: acceptedItem?.unit,
+    }).toStrictEqual({ itemName: "再次改名", spec: "20cm", unit: "盒" });
+
+    await member.client.records.submitHandover({
+      id: record.id,
+      items: accepted.items.map((row) => ({
+        actualQty: row.expectedQty,
+        checked: true,
+        itemId: row.itemId,
+      })),
+    });
+
+    await teamAdmin.client.items.update({
+      id: gauze.id,
+      name: "交班后改名",
+      spec: "30cm",
+      unit: "包",
+    });
+
+    const submitted = await member.client.records.get({ id: record.id });
+
+    const submittedItem = submitted.items.find(
+      (row) => row.itemId === gauze.id
+    );
+
+    expect({
+      itemName: submittedItem?.itemName,
+      spec: submittedItem?.itemSpec,
+      unit: submittedItem?.unit,
+    }).toStrictEqual({ itemName: "再次改名", spec: "20cm", unit: "盒" });
+  });
 });

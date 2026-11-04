@@ -1,12 +1,13 @@
 import { randomUUID } from "node:crypto";
 
 import { ORPCError } from "@orpc/server";
-import { and, count, desc, eq, ne, sql } from "drizzle-orm";
+import { and, count, desc, eq, inArray, ne, or, sql } from "drizzle-orm";
 import Jimp from "jimp";
 import { z } from "zod";
 
 import type { Database } from "@handoverkit/db";
 import {
+  handoverRecord,
   handoverRecordItem,
   item,
   itemImage,
@@ -439,6 +440,56 @@ export const itemsRouter = {
         // 图片表也有级联删除，这里显式清理，确保任何 SQLite 配置下都不留孤儿图片。
         tx.delete(itemImage).where(eq(itemImage.itemId, input.id)).run();
         tx.delete(item).where(eq(item.id, input.id)).run();
+      });
+
+      return { ok: true as const };
+    }),
+
+  forceRemove: adminProcedure
+    .input(z.object({ id: z.string().min(1) }))
+    .handler(async ({ context, input }) => {
+      const row = await requireItemInScope(context.db, context.user, input.id);
+
+      const usageCount =
+        context.db
+          .select({ value: count() })
+          .from(usageItem)
+          .where(eq(usageItem.itemId, input.id))
+          .all()[0]?.value ?? 0;
+
+      const recordItemCount =
+        context.db
+          .select({ value: count() })
+          .from(handoverRecordItem)
+          .where(eq(handoverRecordItem.itemId, input.id))
+          .all()[0]?.value ?? 0;
+
+      if (usageCount > 0) {
+        throw new ORPCError("CONFLICT", {
+          message: "该物品已有消耗记录，彻底删除会破坏历史账目，请改为停用",
+        });
+      }
+
+      if (recordItemCount > 0) {
+        throw new ORPCError("CONFLICT", {
+          message:
+            "该物品已进入交接清单，彻底删除会破坏历史交接记录，请改为停用",
+        });
+      }
+
+      context.db.transaction((tx) => {
+        // 无消耗/交接快照时，才允许清理该物品的库存流水与调拨记录。
+        tx.delete(stockTransfer)
+          .where(
+            or(
+              eq(stockTransfer.sourceItemId, row.id),
+              eq(stockTransfer.targetItemId, row.id)
+            )
+          )
+          .run();
+        tx.delete(stockMovement).where(eq(stockMovement.itemId, row.id)).run();
+        tx.delete(itemImage).where(eq(itemImage.itemId, row.id)).run();
+        tx.delete(item).where(eq(item.id, row.id)).run();
       });
 
       return { ok: true as const };
@@ -882,16 +933,59 @@ export const itemsRouter = {
       }
 
       try {
-        const [updated] = context.db
-          .update(item)
-          .set(patch)
-          .where(eq(item.id, current.id))
-          .returning()
-          .all();
+        const updated = context.db.transaction((tx) => {
+          const [itemRow] = tx
+            .update(item)
+            .set(patch)
+            .where(eq(item.id, current.id))
+            .returning()
+            .all();
 
-        if (updated === undefined) {
-          throw new ORPCError("NOT_FOUND", { message: "物品不存在" });
-        }
+          if (itemRow === undefined) {
+            throw new ORPCError("NOT_FOUND", { message: "物品不存在" });
+          }
+
+          // 未交班（待接收/已接收未交班）的清单仍可编辑：同步名称/规格/单位快照，
+          // 避免管理员改完后扫码页还是旧信息；已提交交班的记录保持历史快照。
+          if (
+            itemRow.name !== current.name ||
+            itemRow.spec !== current.spec ||
+            itemRow.unit !== current.unit
+          ) {
+            const openRecordIds = tx
+              .select({ id: handoverRecord.id })
+              .from(handoverRecord)
+              .where(
+                and(
+                  eq(handoverRecord.matterId, current.matterId),
+                  inArray(handoverRecord.status, [
+                    "pending_acceptance",
+                    "accepted",
+                  ])
+                )
+              )
+              .all()
+              .map((record) => record.id);
+
+            if (openRecordIds.length > 0) {
+              tx.update(handoverRecordItem)
+                .set({
+                  itemName: itemRow.name,
+                  itemSpec: itemRow.spec,
+                  unit: itemRow.unit,
+                })
+                .where(
+                  and(
+                    eq(handoverRecordItem.itemId, itemRow.id),
+                    inArray(handoverRecordItem.recordId, openRecordIds)
+                  )
+                )
+                .run();
+            }
+          }
+
+          return itemRow;
+        });
 
         const name = loadSubWarehouseNames(context.db, [
           updated.subWarehouseId,

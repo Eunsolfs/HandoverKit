@@ -50,7 +50,7 @@ scripts          演示种子、运维脚本
 2. **验证码**：登录前必须通过服务端 SVG 图形验证码；一次性、5 分钟过期、错误 3 次失效；按 IP 5 分钟 10 次失败限流。
 3. **授权**：每个请求从数据库实时读取用户 role/teamId/status（停用立即失效）；三层 procedure：protected / admin / superAdmin；业务查询强制团队过滤，越权返回 NOT_FOUND。
 4. **团队隔离**：matter 是团队级资源；item/record/usage/movement/exception 均挂在 matter 下，由 assertMatterAccess 统一校验。
-5. **二维码**：matter.qrToken 为高熵不可猜测串；扫码页仍需登录并校验属于该团队；管理员可手动轮换 token 使旧码失效。
+5. **二维码**：matter.qrToken 为高熵不可猜测串；扫码页仍需登录并校验属于该团队；管理员可手动轮换 token 使旧码失效。管理员可选择子仓库生成携带 `?subWarehouseId=` 的二维码，扫码页据此直接进入该子仓库；不携带时默认第一个启用子仓库。
 6. **审计**：库存流水不可变；记录保存操作人姓名快照；撤销审批留痕。
 7. **输入校验**：所有 procedure 入参用 Zod；数据库约束（CHECK/UNIQUE/FK）兜底关键不变量（库存非负、状态枚举、日期格式）。
 8. **生产配置**：BETTER_AUTH_SECRET 必须为 32+ 随机串；BETTER_AUTH_URL 必须与浏览器访问的 origin 完全一致（反代需传递 Host/Origin）。

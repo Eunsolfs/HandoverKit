@@ -20,6 +20,13 @@ import {
   DialogTitle,
 } from "@handoverkit/ui/components/dialog";
 import { Input } from "@handoverkit/ui/components/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@handoverkit/ui/components/select";
 import { Skeleton } from "@handoverkit/ui/components/skeleton";
 import { Textarea } from "@handoverkit/ui/components/textarea";
 
@@ -242,6 +249,44 @@ interface MatterQrPanelProps {
   onRequestRotate: () => void;
 }
 
+interface QrWarehouse {
+  name: string;
+}
+
+const resolveSelectedWarehouseId = (
+  selection: { matterId: string | null; warehouseId: string },
+  matterId: string | undefined
+): string =>
+  selection.matterId === (matterId ?? null) ? selection.warehouseId : "all";
+
+const withWarehouse = (
+  value: string,
+  warehouse: QrWarehouse | undefined,
+  separator: string
+): string =>
+  warehouse === undefined ? value : `${value}${separator}${warehouse.name}`;
+
+const warehouseHint = (warehouse: QrWarehouse | undefined): string =>
+  warehouse === undefined
+    ? "扫码后默认进入第一个启用子仓库，可手动切换。"
+    : `扫码后将直接进入「${warehouse.name}」，无需再切换。`;
+
+const buildScanUrl = (
+  origin: string,
+  token: string | null,
+  warehouseId: string | undefined
+): string => {
+  if (token === null) {
+    return "";
+  }
+
+  const base = `${origin}/scan/${token}`;
+
+  return warehouseId === undefined
+    ? base
+    : `${base}?subWarehouseId=${encodeURIComponent(warehouseId)}`;
+};
+
 export const MatterQrPanel = ({
   matter,
   onOpenChange,
@@ -250,17 +295,44 @@ export const MatterQrPanel = ({
 }: MatterQrPanelProps) => {
   const qrToken = matter?.qrToken ?? null;
 
-  const content =
-    qrToken === null ? "" : `${window.location.origin}/scan/${qrToken}`;
+  const [warehouseSelection, setWarehouseSelection] = useState<{
+    matterId: string | null;
+    warehouseId: string;
+  }>({ matterId: null, warehouseId: "all" });
+
+  // 选择只在当前交接事项内有效：切换事项后自动回到“整个事项”，避免残留旧子仓库 id。
+  const selectedWarehouseId = resolveSelectedWarehouseId(
+    warehouseSelection,
+    matter?.id
+  );
+
+  const warehousesQuery = useQuery({
+    ...api.subWarehouses.list.queryOptions({
+      input: { matterId: matter?.id ?? "" },
+    }),
+    enabled: open && matter !== null,
+  });
+
+  const warehouses = warehousesQuery.data ?? [];
+
+  const selectedWarehouse = warehouses.find(
+    (warehouse) => warehouse.id === selectedWarehouseId
+  );
+
+  const content = buildScanUrl(
+    window.location.origin,
+    qrToken,
+    selectedWarehouse?.id
+  );
 
   const qrQuery = useQuery({
-    queryKey: [...qrImageQueryKey, qrToken],
+    queryKey: [...qrImageQueryKey, content],
     queryFn: async () => {
-      if (qrToken === null) {
+      if (content.length === 0) {
         throw new Error("缺少二维码 token");
       }
 
-      const text = `${window.location.origin}/scan/${qrToken}`;
+      const text = content;
 
       const [png, svg] = await Promise.all([
         toDataURL(text, { errorCorrectionLevel: "M", margin: 2, width: 512 }),
@@ -274,7 +346,7 @@ export const MatterQrPanel = ({
 
       return { png, svg };
     },
-    enabled: open && qrToken !== null,
+    enabled: open && content.length > 0,
     gcTime: 0,
     staleTime: Number.POSITIVE_INFINITY,
   });
@@ -322,7 +394,7 @@ export const MatterQrPanel = ({
 
     const link = document.createElement("a");
     link.href = data.png;
-    link.download = `交接二维码-${matter.name}.png`;
+    link.download = `${withWarehouse(`交接二维码-${matter.name}`, selectedWarehouse, "-")}.png`;
     document.body.append(link);
     link.click();
     link.remove();
@@ -337,7 +409,7 @@ export const MatterQrPanel = ({
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `交接二维码-${matter.name}.svg`;
+    link.download = `${withWarehouse(`交接二维码-${matter.name}`, selectedWarehouse, "-")}.svg`;
     document.body.append(link);
     link.click();
     link.remove();
@@ -367,7 +439,7 @@ export const MatterQrPanel = ({
     }
 
     const title = frameDoc.createElement("h1");
-    title.textContent = matter.name;
+    title.textContent = withWarehouse(matter.name, selectedWarehouse, " · ");
     title.style.fontSize = "18px";
     title.style.fontFamily = "sans-serif";
 
@@ -402,6 +474,45 @@ export const MatterQrPanel = ({
               : `${matter.name} · 版本 v${matter.qrVersion}，最近变更 ${formatDateTime(matter.qrChangedAt)}`}
           </DialogDescription>
         </DialogHeader>
+
+        <div className="grid gap-2">
+          <label className="text-sm font-medium" htmlFor="qr-sub-warehouse">
+            二维码对应子仓库
+          </label>
+          <Select
+            items={[
+              { label: "整个事项（默认第一个子仓库）", value: "all" },
+              ...warehouses.map((warehouse) => ({
+                label: warehouse.name,
+                value: warehouse.id,
+              })),
+            ]}
+            onValueChange={(value: string | null) => {
+              if (value !== null) {
+                setWarehouseSelection({
+                  matterId: matter?.id ?? null,
+                  warehouseId: value,
+                });
+              }
+            }}
+            value={selectedWarehouse?.id ?? "all"}
+          >
+            <SelectTrigger className="w-full" id="qr-sub-warehouse">
+              <SelectValue placeholder="选择子仓库" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">整个事项（默认第一个子仓库）</SelectItem>
+              {warehouses.map((warehouse) => (
+                <SelectItem key={warehouse.id} value={warehouse.id}>
+                  {warehouse.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-muted-foreground text-xs">
+            {warehouseHint(selectedWarehouse)}
+          </p>
+        </div>
 
         <div className="grid justify-items-center gap-3">
           <div className="bg-white p-3">{qrBody}</div>

@@ -890,11 +890,13 @@ export const ItemStatusConfirmDialog = ({
 };
 
 interface ItemDeleteConfirmDialogProps {
+  force?: boolean;
   onOpenChange: (open: boolean) => void;
   item: ItemDto;
 }
 
 export const ItemDeleteConfirmDialog = ({
+  force = false,
   item,
   onOpenChange,
 }: ItemDeleteConfirmDialogProps) => {
@@ -902,7 +904,9 @@ export const ItemDeleteConfirmDialog = ({
   const [error, setError] = useState<string | null>(null);
 
   const removeItem = useMutation({
-    ...api.items.remove.mutationOptions(),
+    ...(force
+      ? api.items.forceRemove.mutationOptions()
+      : api.items.remove.mutationOptions()),
     onError: (mutationError) => {
       setError(
         isErrorLike(mutationError)
@@ -911,22 +915,26 @@ export const ItemDeleteConfirmDialog = ({
       );
     },
     onSuccess: () => {
-      toast.success("物品已删除");
+      toast.success(force ? "物品已彻底删除" : "物品已删除");
       refreshItemViews(queryClient);
       onOpenChange(false);
     },
   });
 
+  let description: ReactNode;
+
+  if (error !== null) {
+    description = <span className="text-destructive">{error}</span>;
+  } else if (force) {
+    description = `将彻底删除「${item.name}」及其库存流水、调拨记录、产品图，删除后不可恢复。若已有消耗记录或交接清单快照，服务端会拒绝并建议改为停用。`;
+  } else {
+    description = `删除后「${item.name}」将从仓库移除。若已有库存流水或交接记录，服务端会提示改为停用。`;
+  }
+
   return (
     <ConfirmDialog
-      confirmLabel="确认删除"
-      description={
-        error === null ? (
-          `删除后「${item.name}」将从仓库移除。若已有库存流水或交接记录，服务端会提示改为停用。`
-        ) : (
-          <span className="text-destructive">{error}</span>
-        )
-      }
+      confirmLabel={force ? "确认彻底删除" : "确认删除"}
+      description={description}
       destructive
       onConfirm={() => {
         removeItem.mutate({ id: item.id });
@@ -934,7 +942,7 @@ export const ItemDeleteConfirmDialog = ({
       onOpenChange={onOpenChange}
       open
       pending={removeItem.isPending}
-      title="删除物品"
+      title={force ? "彻底删除物品" : "删除物品"}
     />
   );
 };
