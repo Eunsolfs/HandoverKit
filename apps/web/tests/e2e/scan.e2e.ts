@@ -1,10 +1,12 @@
+import { randomUUID } from "node:crypto";
+
 import { expect, test } from "@playwright/test";
 import type { BrowserContext, Page } from "@playwright/test";
 
 import { login } from "../support/api.ts";
 import { e2eBaseURL } from "../support/server.ts";
 
-const uniqueSuffix = () => Date.now().toString(36).slice(-6).toUpperCase();
+const uniqueSuffix = () => randomUUID().slice(0, 8).toUpperCase();
 
 /** 把 API 登录得到的会话 Cookie 注入浏览器上下文，扫码页即处于已登录态。 */
 const addSessionCookie = async (context: BrowserContext, cookie: string) => {
@@ -107,6 +109,17 @@ test("扫码页完成接班核对、用物登记与交班表全链路", async ({
   await expect(page.getByText("交班表已提交", { exact: true })).toBeVisible();
   await expect(page.getByRole("alert")).toContainText("今日交班表已提交");
   await expect(page.getByText("已交班", { exact: true })).toBeVisible();
+
+  // 四、交班后从扫码页直达补登记，并预选当前事项/子仓库
+  await page.getByRole("tab", { name: "用物登记" }).click();
+  const backfillLink = page.getByRole("link", { name: "去补登记" });
+  await expect(backfillLink).toBeVisible();
+  await backfillLink.click();
+  await expect(page).toHaveURL(/\/usage\?.*mode=backfill/u);
+  await expect(page.getByRole("dialog")).toContainText("用物补登记");
+  await expect(page.getByRole("button", { name: "提交补登记" })).toBeVisible();
+  await expect(page.getByRole("dialog")).toContainText(matter.name);
+  await page.keyboard.press("Escape");
 
   // 独立数据核对：状态闭环、消耗记录落库、库存扣减
   const today = await client.records.today({ matterId: matter.id });

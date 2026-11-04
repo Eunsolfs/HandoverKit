@@ -4,6 +4,7 @@ import { HistoryIcon, PlusIcon, RotateCcwIcon } from "lucide-react";
 import { useState } from "react";
 import type { ReactNode } from "react";
 import { toast } from "sonner";
+import { z } from "zod";
 
 import { Button } from "@handoverkit/ui/components/button";
 import {
@@ -45,6 +46,13 @@ import type { MatterDto, UsageDto, UsageStatusDto } from "#src/lib/types.ts";
 
 const ALL_MATTERS = "all";
 const ALL_STATUS = "all";
+
+const usageSearchSchema = z.object({
+  matterId: z.string().min(1).optional(),
+  mode: z.literal("backfill").optional(),
+  subWarehouseId: z.string().min(1).optional(),
+  teamId: z.string().min(1).optional(),
+});
 
 const monthRange = (): DateRangeValue => {
   const now = new Date();
@@ -160,6 +168,7 @@ const buildUsageColumns = (
 interface UsageCreateDialogProps {
   matters: MatterDto[];
   defaultMatterId: string | null;
+  defaultSubWarehouseId?: string;
   mode: "normal" | "backfill";
   operatorName: string;
   onClose: () => void;
@@ -168,6 +177,7 @@ interface UsageCreateDialogProps {
 // eslint-disable-next-line complexity
 const UsageCreateDialog = ({
   defaultMatterId,
+  defaultSubWarehouseId,
   matters,
   mode,
   onClose,
@@ -180,7 +190,9 @@ const UsageCreateDialog = ({
     defaultMatterId ?? matters[0]?.id ?? ""
   );
 
-  const [subWarehouseId, setSubWarehouseId] = useState("");
+  const [subWarehouseId, setSubWarehouseId] = useState(
+    defaultSubWarehouseId ?? ""
+  );
 
   const warehousesQuery = useQuery({
     ...api.subWarehouses.list.queryOptions({ input: { matterId } }),
@@ -492,11 +504,14 @@ const RevokeDialog = ({ onClose, usage }: RevokeDialogProps) => {
 };
 
 const UsagePage = () => {
+  const search = Route.useSearch();
+  const navigate = Route.useNavigate();
   const { activeTeamId } = useActiveTeam();
+  const teamId = search.teamId ?? activeTeamId;
   const me = useMe(activeTeamId);
   const queryClient = useQueryClient();
   const [range, setRange] = useState<DateRangeValue>(monthRange);
-  const [matterId, setMatterId] = useState("");
+  const [matterId, setMatterId] = useState(search.matterId ?? "");
 
   const [status, setStatus] = useState<UsageStatusDto | typeof ALL_STATUS>(
     ALL_STATUS
@@ -506,16 +521,16 @@ const UsagePage = () => {
   const [pageSize, setPageSize] = useState(20);
 
   const [createMode, setCreateMode] = useState<"normal" | "backfill" | null>(
-    null
+    search.mode === "backfill" ? "backfill" : null
   );
 
   const [revokeTarget, setRevokeTarget] = useState<UsageDto | null>(null);
 
   const mattersQuery = useQuery({
     ...api.matters.list.queryOptions({
-      input: { teamId: activeTeamId ?? undefined },
+      input: { teamId: teamId ?? undefined },
     }),
-    enabled: activeTeamId !== null,
+    enabled: teamId !== null,
   });
 
   const usageQuery = useQuery({
@@ -526,11 +541,11 @@ const UsagePage = () => {
         page,
         pageSize,
         status: status === ALL_STATUS ? undefined : status,
-        teamId: activeTeamId ?? undefined,
+        teamId: teamId ?? undefined,
         to: range.to,
       },
     }),
-    enabled: activeTeamId !== null,
+    enabled: teamId !== null,
   });
 
   if (activeTeamId === null) {
@@ -695,11 +710,28 @@ const UsagePage = () => {
       {createMode === null ? null : (
         <UsageCreateDialog
           defaultMatterId={matterId.length === 0 ? null : matterId}
+          defaultSubWarehouseId={search.subWarehouseId}
           matters={matters}
           mode={createMode}
           onClose={() => {
             setCreateMode(null);
             void queryClient.invalidateQueries();
+
+            if (
+              search.matterId !== undefined ||
+              search.mode !== undefined ||
+              search.subWarehouseId !== undefined ||
+              search.teamId !== undefined
+            ) {
+              if (
+                search.teamId !== undefined &&
+                search.teamId !== activeTeamId
+              ) {
+                setMatterId("");
+              }
+
+              void navigate({ search: {}, replace: true });
+            }
           }}
           operatorName={me.data?.user.name ?? ""}
         />
@@ -719,4 +751,5 @@ const UsagePage = () => {
 
 export const Route = createFileRoute("/_app/usage/")({
   component: UsagePage,
+  validateSearch: usageSearchSchema,
 });

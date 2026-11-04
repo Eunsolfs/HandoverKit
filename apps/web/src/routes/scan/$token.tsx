@@ -3,6 +3,7 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 import {
   CheckCircle2Icon,
   ClipboardCheckIcon,
+  HistoryIcon,
   ScanLineIcon,
   ShieldAlertIcon,
 } from "lucide-react";
@@ -647,14 +648,27 @@ const UsagePanel = ({
   }
 
   if (record.status === "handover_submitted") {
+    const backfillHref = `/usage?${new URLSearchParams({
+      matterId: data.matter.id,
+      mode: "backfill",
+      subWarehouseId: data.today.subWarehouseId,
+      teamId: data.team.id,
+    }).toString()}`;
+
     return (
-      <Alert>
-        <ShieldAlertIcon />
-        <AlertTitle>今日已交班，普通用物登记已关闭</AlertTitle>
-        <AlertDescription>
-          补录历史消耗请前往「用物消耗」页使用「补登记」。
-        </AlertDescription>
-      </Alert>
+      <div className="grid gap-3">
+        <Alert>
+          <ShieldAlertIcon />
+          <AlertTitle>今日已交班，普通用物登记已关闭</AlertTitle>
+          <AlertDescription>
+            补录历史消耗请前往「用物消耗」页使用「补登记」，或直接点击下方按钮。
+          </AlertDescription>
+        </Alert>
+        <ButtonLink href={backfillHref} size="lg" variant="outline">
+          <HistoryIcon />
+          去补登记
+        </ButtonLink>
+      </div>
     );
   }
 
