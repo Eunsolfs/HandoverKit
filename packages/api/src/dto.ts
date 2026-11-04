@@ -142,6 +142,8 @@ export interface ItemDto {
   matterId: string;
   subWarehouseId: string;
   subWarehouseName: string;
+  /** 产品图缩略图地址；无图时为 null。 */
+  imageUrl: string | null;
   name: string;
   spec: string | null;
   unit: string;
@@ -157,6 +159,7 @@ export interface ItemDto {
 
 export interface RecordItemDto {
   itemId: string;
+  imageUrl: string | null;
   itemName: string;
   itemSpec: string | null;
   unit: string;
@@ -427,10 +430,16 @@ export const toMatterDto = (
   todayStatus,
 });
 
+const itemImageUrl = (itemId: string, updatedAt: Date | null): string | null =>
+  updatedAt === null
+    ? null
+    : `/api/items/${itemId}/image?v=${updatedAt.getTime()}`;
+
 export const toItemDto = (row: ItemRow, subWarehouseName: string): ItemDto => ({
   category: row.category,
   createdAt: requireMs(row.createdAt),
   id: row.id,
+  imageUrl: itemImageUrl(row.id, row.imageUpdatedAt),
   location: row.location,
   lowStock: row.stock <= row.minStock,
   matterId: row.matterId,
@@ -445,7 +454,10 @@ export const toItemDto = (row: ItemRow, subWarehouseName: string): ItemDto => ({
   unit: row.unit,
 });
 
-const toRecordItemDto = (row: RecordItemRow): RecordItemDto => ({
+const toRecordItemDto = (
+  row: RecordItemRow,
+  imageUrl: string | null
+): RecordItemDto => ({
   acceptedAt: toMs(row.acceptedAt),
   actualQty: row.actualQty,
   checked: row.checked,
@@ -453,6 +465,7 @@ const toRecordItemDto = (row: RecordItemRow): RecordItemDto => ({
   handoverActualQty: row.handoverActualQty,
   handoverChecked: row.handoverChecked,
   handoverNote: row.handoverNote,
+  imageUrl,
   itemId: row.itemId,
   itemName: row.itemName,
   itemSpec: row.itemSpec,
@@ -485,7 +498,7 @@ export const toRecordSummaryDto = (
 });
 
 export interface RecordDetailExtras {
-  items: RecordItemRow[];
+  items: { row: RecordItemRow; imageUrl: string | null }[];
   usages: UsageDto[];
   exceptions: ExceptionDto[];
   revokeRequests: RevokeRequestDto[];
@@ -501,7 +514,9 @@ export const toRecordDetailDto = (
   acceptanceNote: record.acceptanceNote,
   exceptions: extras.exceptions,
   handoverNote: record.handoverNote,
-  items: extras.items.map(toRecordItemDto),
+  items: extras.items.map((entry) =>
+    toRecordItemDto(entry.row, entry.imageUrl)
+  ),
   permissions: extras.permissions,
   revokeRequests: extras.revokeRequests,
   usages: extras.usages,

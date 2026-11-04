@@ -66,6 +66,7 @@ catalog:
   # db
   drizzle-kit: 1.0.0-rc.5
   drizzle-orm: 1.0.0-rc.5
+  jimp: 0.22.12
 
 overrides:
   vite@*: "catalog:"

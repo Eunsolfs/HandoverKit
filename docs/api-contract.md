@@ -99,6 +99,7 @@ interface ItemDto {
   matterId: string;
   subWarehouseId: string;
   subWarehouseName: string;
+  imageUrl: string | null;
   name: string;
   spec: string | null;
   unit: string;
@@ -114,6 +115,7 @@ interface ItemDto {
 
 interface RecordItemDto {
   itemId: string;
+  imageUrl: string | null;
   itemName: string;
   itemSpec: string | null;
   unit: string;
@@ -349,6 +351,8 @@ interface StatsOverviewDto {
 ### 4.7 usage（用物消耗）
 
 > 流程门禁：`usage.create` 要求 `subWarehouseId + usedAt` 存在交接记录且状态为 accepted（已交班不可再普通登记）；若验收存在数量差异且该记录没有任何异常事件，返回 `CONFLICT`。
+> 产品图读取：`GET /api/items/:itemId/image?v=...`，必须登录且同团队；无图/越权返回 404；响应为压缩后的 JPEG，可被浏览器缓存。
+
 > `usage.backfill` 是独立补登记入口：登录即可，不要求交接记录/接班状态；必须提供 `usedAt`、`usedTime`（HH:mm）、`backfillReason`（2–300 字）与物品数量；不允许未来日期；扣减来源物品库存。
 
 | Procedure              | 入参                                                                                                                     | 返回                                  | 权限                                                                          |

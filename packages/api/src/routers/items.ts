@@ -2,12 +2,14 @@ import { randomUUID } from "node:crypto";
 
 import { ORPCError } from "@orpc/server";
 import { and, count, desc, eq, ne, sql } from "drizzle-orm";
+import Jimp from "jimp";
 import { z } from "zod";
 
 import type { Database } from "@handoverkit/db";
 import {
   handoverRecordItem,
   item,
+  itemImage,
   stockMovement,
   stockTransfer,
   subWarehouse,
@@ -690,6 +692,125 @@ export const itemsRouter = {
           names.get(row.toSubWarehouseId) ?? ""
         )
       );
+    }),
+
+  uploadImage: adminProcedure
+    .input(
+      z.object({
+        id: z.string().min(1),
+        imageData: z
+          .string()
+          .min(32)
+          .max(12_000_000)
+          .regex(
+            /^data:image\/(?:png|jpe?g|webp);base64,/iu,
+            "仅支持 PNG/JPEG/WebP 图片"
+          ),
+      })
+    )
+    .handler(async ({ context, input }) => {
+      const row = await requireItemInScope(context.db, context.user, input.id);
+      const base64 = input.imageData.slice(input.imageData.indexOf(",") + 1);
+      const buffer = Buffer.from(base64, "base64");
+
+      if (buffer.length > 8 * 1024 * 1024) {
+        throw new ORPCError("BAD_REQUEST", {
+          message: "图片不能超过 8MB",
+        });
+      }
+
+      let output: Buffer;
+
+      try {
+        const image = await Jimp.read(buffer);
+        image.cover(320, 320);
+        image.quality(72);
+        output = await image.getBufferAsync(Jimp.MIME_JPEG);
+      } catch {
+        throw new ORPCError("BAD_REQUEST", {
+          message: "图片格式不支持或已损坏",
+        });
+      }
+
+      if (output.length > 1_500_000) {
+        throw new ORPCError("BAD_REQUEST", {
+          message: "图片处理后仍然过大，请换一张更小的图片",
+        });
+      }
+
+      const now = new Date();
+
+      const updated = context.db.transaction((tx) => {
+        tx.insert(itemImage)
+          .values({
+            data: output.toString("base64"),
+            height: 320,
+            itemId: row.id,
+            mime: "image/jpeg",
+            updatedAt: now,
+            width: 320,
+          })
+          .onConflictDoUpdate({
+            set: {
+              data: output.toString("base64"),
+              height: 320,
+              mime: "image/jpeg",
+              updatedAt: now,
+              width: 320,
+            },
+            target: itemImage.itemId,
+          })
+          .run();
+
+        const [itemRow] = tx
+          .update(item)
+          .set({ imageUpdatedAt: now, updatedAt: now })
+          .where(eq(item.id, row.id))
+          .returning()
+          .all();
+
+        if (itemRow === undefined) {
+          throw new ORPCError("NOT_FOUND", { message: "物品不存在" });
+        }
+
+        return itemRow;
+      });
+
+      const name = loadSubWarehouseNames(context.db, [
+        updated.subWarehouseId,
+      ]).get(updated.subWarehouseId);
+
+      return toItemDto(updated, name ?? "");
+    }),
+
+  removeImage: adminProcedure
+    .input(z.object({ id: z.string().min(1) }))
+    .handler(async ({ context, input }) => {
+      const row = await requireItemInScope(context.db, context.user, input.id);
+      const now = new Date();
+
+      const updated = context.db.transaction((tx) => {
+        tx.delete(itemImage).where(eq(itemImage.itemId, row.id)).run();
+
+        const [itemRow] = tx
+          .update(item)
+          .set({ imageUpdatedAt: null, updatedAt: now })
+          .where(eq(item.id, row.id))
+          .returning()
+          .all();
+
+        if (itemRow === undefined) {
+          throw new ORPCError("NOT_FOUND", { message: "物品不存在" });
+        }
+
+        return itemRow;
+      });
+
+      const name = loadSubWarehouseNames(context.db, [
+        updated.subWarehouseId,
+      ]).get(updated.subWarehouseId);
+
+      return toItemDto(updated, name ?? "");
     }),
 
   update: adminProcedure

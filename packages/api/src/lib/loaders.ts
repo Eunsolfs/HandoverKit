@@ -518,6 +518,26 @@ export const loadRecordDetail = (
     .where(eq(handoverRecordItem.recordId, row.id))
     .all();
 
+  const itemImageRows = db
+    .select({ id: item.id, imageUpdatedAt: item.imageUpdatedAt })
+    .from(item)
+    .where(
+      inArray(
+        item.id,
+        items.map((itemRow) => itemRow.itemId)
+      )
+    )
+    .all();
+
+  const itemImageUrlById = new Map(
+    itemImageRows.map((imageRow) => [
+      imageRow.id,
+      imageRow.imageUpdatedAt === null
+        ? null
+        : `/api/items/${imageRow.id}/image?v=${imageRow.imageUpdatedAt.getTime()}`,
+    ])
+  );
+
   const usageRows = db
     .select()
     .from(usageRecord)
@@ -585,7 +605,10 @@ export const loadRecordDetail = (
 
   return toRecordDetailDto(summary, row, {
     exceptions: loadExceptionDtos(db, exceptionRows),
-    items,
+    items: items.map((itemRow) => ({
+      imageUrl: itemImageUrlById.get(itemRow.itemId) ?? null,
+      row: itemRow,
+    })),
     permissions: {
       canAccept: row.status === "pending_acceptance",
       canDelete: isAdmin(profile) && usageRows.length === 0,

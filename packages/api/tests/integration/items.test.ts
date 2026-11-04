@@ -1,3 +1,4 @@
+import Jimp from "jimp";
 import { describe, expect, it } from "vite-plus/test";
 
 import { createClient, createTestUser, db } from "../support/api.ts";
@@ -306,5 +307,34 @@ describe("items", () => {
       spec: "M",
       stock: 9,
     });
+  });
+
+  it("产品图上传后压缩为缩略图，支持读取与删除", async () => {
+    const { matter, teamAdmin } = await setup();
+
+    const item = await teamAdmin.client.items.create({
+      matterId: matter.id,
+      name: "带图物品",
+      stock: 1,
+      unit: "个",
+    });
+
+    const source = new Jimp(800, 600, 0x22_aa_88_ff);
+    const png = await source.getBufferAsync(Jimp.MIME_PNG);
+
+    const uploaded = await teamAdmin.client.items.uploadImage({
+      id: item.id,
+      imageData: `data:image/png;base64,${png.toString("base64")}`,
+    });
+
+    expect(uploaded.imageUrl).toMatch(/^\/api\/items\/.+\/image\?v=\d+$/u);
+
+    const listed = await teamAdmin.client.items.list({ matterId: matter.id });
+    expect(listed.find((row) => row.id === item.id)?.imageUrl).toBe(
+      uploaded.imageUrl
+    );
+
+    const removed = await teamAdmin.client.items.removeImage({ id: item.id });
+    expect(removed.imageUrl).toBeNull();
   });
 });

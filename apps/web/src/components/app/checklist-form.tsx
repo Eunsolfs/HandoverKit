@@ -1,7 +1,16 @@
+import { useState } from "react";
+
 import { Checkbox } from "@handoverkit/ui/components/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@handoverkit/ui/components/dialog";
 import { Input } from "@handoverkit/ui/components/input";
 
 export interface ChecklistSourceItem {
+  imageUrl?: string | null;
   itemId: string;
   itemName: string;
   itemSpec: string | null;
@@ -62,6 +71,48 @@ export const toChecklistPayload = (lines: ChecklistLine[]) =>
     itemId: line.itemId,
     note: line.note.trim().length === 0 ? null : line.note.trim(),
   }));
+
+const ChecklistImage = ({
+  imageUrl,
+  itemName,
+}: {
+  imageUrl: string;
+  itemName: string;
+}) => {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      <button
+        aria-label={`查看 ${itemName} 产品图`}
+        className="focus-visible:ring-ring size-16 shrink-0 overflow-hidden rounded-lg border transition-opacity hover:opacity-85 focus-visible:ring-2 focus-visible:outline-none sm:size-20"
+        onClick={() => {
+          setOpen(true);
+        }}
+        type="button"
+      >
+        <img
+          alt={`${itemName} 产品图`}
+          className="size-full object-cover"
+          loading="lazy"
+          src={imageUrl}
+        />
+      </button>
+      <Dialog onOpenChange={setOpen} open={open}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{itemName}</DialogTitle>
+          </DialogHeader>
+          <img
+            alt={`${itemName} 产品大图`}
+            className="mx-auto max-h-[70vh] w-auto max-w-full rounded-lg object-contain"
+            src={imageUrl}
+          />
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+};
 
 interface ChecklistFormProps {
   items: ChecklistSourceItem[];
@@ -139,6 +190,12 @@ export const ChecklistForm = ({
                 </span>
               </div>
             </div>
+            {item.imageUrl !== undefined && item.imageUrl !== null ? (
+              <ChecklistImage
+                imageUrl={item.imageUrl}
+                itemName={item.itemName}
+              />
+            ) : null}
           </div>
           {mismatch ? (
             <div className="mt-2 grid gap-1">

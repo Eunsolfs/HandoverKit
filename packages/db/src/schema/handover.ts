@@ -184,6 +184,8 @@ export const item = snakeCase.table(
     location: text(),
     note: text(),
     status: text().notNull().default("active"),
+    /** 产品图最近更新时间；非空表示存在缩略图。 */
+    imageUpdatedAt: timestamp(),
     ...timestamps,
   },
   (table) => [
@@ -207,6 +209,29 @@ export const item = snakeCase.table(
       "item_unit_length",
       sql`length(trim(${table.unit})) between 1 and 20`
     ),
+  ]
+);
+
+/** 物品产品图：服务端压缩后的缩略图（base64），独立表避免列表查询加载图片。 */
+export const itemImage = snakeCase.table(
+  "item_image",
+  {
+    itemId: text()
+      .primaryKey()
+      .references(() => item.id, { onDelete: "cascade" }),
+    mime: text().notNull(),
+    data: text().notNull(),
+    width: integer().notNull(),
+    height: integer().notNull(),
+    updatedAt: timestamp()
+      .notNull()
+      .default(now)
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    check("item_image_width_positive", sql`${table.width} > 0`),
+    check("item_image_height_positive", sql`${table.height} > 0`),
+    check("item_image_data_length", sql`length(${table.data}) <= 2000000`),
   ]
 );
 

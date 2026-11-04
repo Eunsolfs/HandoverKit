@@ -102,6 +102,21 @@ const buildItemFormDefaults = (item: ItemDto | null): ItemFormDefaults => ({
   unit: item?.unit ?? "",
 });
 
+const readImageFile = async (file: File): Promise<string> => {
+  const buffer = await file.arrayBuffer();
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  const chunkSize = 0x80_00;
+
+  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+    binary += String.fromCodePoint(
+      ...bytes.subarray(offset, offset + chunkSize)
+    );
+  }
+
+  return `data:${file.type};base64,${btoa(binary)}`;
+};
+
 export const ItemFormDialog = ({
   item,
   onOpenChange,
@@ -117,6 +132,13 @@ export const ItemFormDialog = ({
   const [minStock, setMinStock] = useState(defaults.minStock);
   const [location, setLocation] = useState(defaults.location);
   const [note, setNote] = useState(defaults.note);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+
+  const [imagePreview, setImagePreview] = useState<string | null>(
+    item?.imageUrl ?? null
+  );
+
+  const [imageRemoved, setImageRemoved] = useState(false);
   const [errors, setErrors] = useState<ItemFormErrors>({});
 
   const refreshItems = () => {
@@ -135,11 +157,6 @@ export const ItemFormDialog = ({
         form: isErrorLike(error) ? error.message : "物品创建失败，请重试",
       });
     },
-    onSuccess: () => {
-      toast.success("物品已创建");
-      refreshItems();
-      onOpenChange(false);
-    },
   });
 
   const updateItem = useMutation({
@@ -149,14 +166,31 @@ export const ItemFormDialog = ({
         form: isErrorLike(error) ? error.message : "物品更新失败，请重试",
       });
     },
-    onSuccess: () => {
-      toast.success("物品信息已更新");
-      refreshItems();
-      onOpenChange(false);
+  });
+
+  const uploadImage = useMutation({
+    ...api.items.uploadImage.mutationOptions(),
+    onError: (error) => {
+      setErrors({
+        form: isErrorLike(error) ? error.message : "产品图上传失败，请重试",
+      });
     },
   });
 
-  const pending = createItem.isPending || updateItem.isPending;
+  const removeImage = useMutation({
+    ...api.items.removeImage.mutationOptions(),
+    onError: (error) => {
+      setErrors({
+        form: isErrorLike(error) ? error.message : "产品图删除失败，请重试",
+      });
+    },
+  });
+
+  const pending =
+    createItem.isPending ||
+    updateItem.isPending ||
+    uploadImage.isPending ||
+    removeImage.isPending;
 
   const validate = (): boolean => {
     const next = validateItemForm({ item, minStock, name, stock, unit });
@@ -166,47 +200,60 @@ export const ItemFormDialog = ({
     return Object.keys(next).length === 0;
   };
 
-  const handleSubmit = (event: SubmitEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     if (!validate()) {
       return;
     }
 
-    const minStockValue = toWholeNumber(minStock, 0);
-
-    if (item === null) {
-      if (subWarehouseId === null) {
-        setErrors({ form: "请先选择子仓库" });
-
-        return;
-      }
-
-      createItem.mutate({
-        category: optionalText(category),
-        location: optionalText(location),
-        minStock: minStockValue,
-        name: name.trim(),
-        note: optionalText(note),
-        spec: optionalText(spec),
-        stock: toWholeNumber(stock, 0),
-        subWarehouseId,
-        unit: unit.trim(),
-      });
+    if (item === null && subWarehouseId === null) {
+      setErrors({ form: "请先选择子仓库" });
 
       return;
     }
 
-    updateItem.mutate({
-      category: nullableText(category),
-      id: item.id,
-      location: nullableText(location),
-      minStock: minStockValue,
-      name: name.trim(),
-      note: nullableText(note),
-      spec: nullableText(spec),
-      unit: unit.trim(),
-    });
+    const minStockValue = toWholeNumber(minStock, 0);
+    setErrors({});
+
+    try {
+      const saved =
+        item === null
+          ? await createItem.mutateAsync({
+              category: optionalText(category),
+              location: optionalText(location),
+              minStock: minStockValue,
+              name: name.trim(),
+              note: optionalText(note),
+              spec: optionalText(spec),
+              stock: toWholeNumber(stock, 0),
+              subWarehouseId: subWarehouseId ?? "",
+              unit: unit.trim(),
+            })
+          : await updateItem.mutateAsync({
+              category: nullableText(category),
+              id: item.id,
+              location: nullableText(location),
+              minStock: minStockValue,
+              name: name.trim(),
+              note: nullableText(note),
+              spec: nullableText(spec),
+              unit: unit.trim(),
+            });
+
+      if (imageFile !== null) {
+        const imageData = await readImageFile(imageFile);
+        await uploadImage.mutateAsync({ id: saved.id, imageData });
+      } else if (item !== null && imageRemoved) {
+        await removeImage.mutateAsync({ id: item.id });
+      }
+
+      toast.success(item === null ? "物品已创建" : "物品信息已更新");
+      refreshItems();
+      onOpenChange(false);
+    } catch {
+      // 具体错误已由 mutation onError 写入 form。
+    }
   };
 
   return (
@@ -223,7 +270,9 @@ export const ItemFormDialog = ({
         <form
           className="flex flex-col gap-3"
           noValidate
-          onSubmit={handleSubmit}
+          onSubmit={(event) => {
+            void handleSubmit(event);
+          }}
         >
           {errors.form === undefined ? null : (
             <p className="text-destructive text-sm" role="alert">
@@ -359,6 +408,86 @@ export const ItemFormDialog = ({
                 />
               )}
             </FormField>
+          </div>
+
+          <div className="grid gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-sm font-medium">
+                产品图
+                <span className="text-muted-foreground ml-1 font-normal">
+                  （可选）
+                </span>
+              </span>
+              {imagePreview === null ? null : (
+                <Button
+                  disabled={pending}
+                  onClick={() => {
+                    setImageFile(null);
+                    setImagePreview(null);
+                    setImageRemoved(item !== null && item.imageUrl !== null);
+                  }}
+                  size="xs"
+                  type="button"
+                  variant="outline"
+                >
+                  移除图片
+                </Button>
+              )}
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="bg-muted flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-lg border">
+                {imagePreview === null ? (
+                  <span className="text-muted-foreground px-2 text-center text-xs">
+                    暂无图片
+                  </span>
+                ) : (
+                  <img
+                    alt="产品图预览"
+                    className="size-full object-cover"
+                    src={imagePreview}
+                  />
+                )}
+              </div>
+              <div className="grid min-w-0 flex-1 gap-2">
+                <Input
+                  accept="image/png,image/jpeg,image/webp"
+                  aria-label="选择产品图"
+                  disabled={pending}
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+
+                    if (file === undefined) {
+                      return;
+                    }
+
+                    if (
+                      !["image/jpeg", "image/png", "image/webp"].includes(
+                        file.type
+                      )
+                    ) {
+                      setErrors({ form: "仅支持 PNG/JPEG/WebP 图片" });
+
+                      return;
+                    }
+
+                    if (file.size > 8 * 1024 * 1024) {
+                      setErrors({ form: "图片不能超过 8MB" });
+
+                      return;
+                    }
+
+                    setErrors({});
+                    setImageFile(file);
+                    setImageRemoved(false);
+                    setImagePreview(URL.createObjectURL(file));
+                  }}
+                  type="file"
+                />
+                <p className="text-muted-foreground text-xs">
+                  上传后自动裁剪并压缩为 320×320 缩略图，用于交接清单辨认。
+                </p>
+              </div>
+            </div>
           </div>
 
           <FormField id="item-note" label="备注">
