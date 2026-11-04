@@ -7,7 +7,7 @@
 工作流文件：[.github/workflows/release.yml](../.github/workflows/release.yml)
 
 ```text
-git tag v0.1.2 && git push origin v0.1.2
+git tag v1.0.0 && git push origin v1.0.0
         │
         ▼
 ┌─────────────────┐   ┌──────────────────┐   ┌─────────────────────────┐
@@ -100,7 +100,7 @@ sudo HK_DIR=/opt/handoverkit \
 ### 升级与回滚
 
 ```bash
-sudo bash /opt/handoverkit/ops.sh upgrade v0.1.2
+sudo bash /opt/handoverkit/ops.sh upgrade v1.0.0
 # 失败时：
 sudo bash /opt/handoverkit/ops.sh rollback
 ```
