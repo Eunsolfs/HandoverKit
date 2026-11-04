@@ -188,7 +188,7 @@ const LoginPage = () => {
                   onChange={(event) => {
                     setUsername(event.target.value);
                   }}
-                  placeholder="例如 admin"
+                  placeholder="请输入登录名"
                   value={username}
                 />
               )}
