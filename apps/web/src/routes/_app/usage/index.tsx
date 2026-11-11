@@ -240,6 +240,7 @@ const UsageCreateDialog = ({
       note: value.note,
       operatorName: value.operatorName,
       patientName: value.patientName,
+      allowCrossWarehouse: value.allowCrossWarehouse,
       patientNo: value.patientNo,
       patientPhone: value.patientPhone,
       patientType: value.patientType,
@@ -295,9 +296,15 @@ const UsageCreateDialog = ({
   } else {
     itemsSection = (
       <UsageEntryForm
+        key={selectedWarehouseId}
         defaultOperatorName={operatorName}
         items={items}
         mode={mode}
+        subWarehouseId={selectedWarehouseId}
+        subWarehouseName={
+          warehouses.find((warehouse) => warehouse.id === selectedWarehouseId)
+            ?.name ?? ""
+        }
         onSubmit={handleSubmit}
         pending={pending}
         submitLabel={isBackfill ? "提交补登记" : "提交登记"}
@@ -322,7 +329,7 @@ const UsageCreateDialog = ({
           <DialogDescription>
             {isBackfill
               ? "补登记不受接班门禁限制，但必须填写使用时间、数量和补录原因；提交后立即扣减对应子仓库库存。"
-              : "登记日期必须已完成该子仓库的接班核对并确认接收；如接班数量有差异，需先提交异常上报。物品可跨子仓库选择（会扣减来源子仓库库存）。"}
+              : "登记日期必须已完成该子仓库的接班核对并确认接收；如接班数量有差异，需先提交异常上报。默认只显示当前子仓库物品，确需借用其他子仓库时点击「跨仓借用」。"}
           </DialogDescription>
         </DialogHeader>
 
@@ -366,7 +373,7 @@ const UsageCreateDialog = ({
               hint={
                 isBackfill
                   ? "补录记到该子仓库名下；物品可从其他子仓库借取"
-                  : "当前班次所在子仓库，交接与消耗按它统计"
+                  : "当前班次所在子仓库；物品默认从该子仓库选择"
               }
               id="usage-sub-warehouse"
               label="使用子仓库"

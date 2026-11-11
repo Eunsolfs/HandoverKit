@@ -68,6 +68,18 @@ test("扫码页完成接班核对、用物登记与交班表全链路", async ({
     unit: "瓶",
   });
 
+  const secondWarehouse = await client.subWarehouses.create({
+    matterId: matter.id,
+    name: "跨仓测试仓库",
+  });
+
+  await client.items.create({
+    name: "跨仓专用物品",
+    stock: 5,
+    subWarehouseId: secondWarehouse.id,
+    unit: "个",
+  });
+
   await addSessionCookie(context, cookie);
   await page.goto(`/scan/${matter.qrToken}`, {
     waitUntil: "networkidle",
@@ -86,12 +98,28 @@ test("扫码页完成接班核对、用物登记与交班表全链路", async ({
   await expect(page.getByText("已完成接班核对", { exact: true })).toBeVisible();
   await expect(page.getByText("已接收")).toBeVisible();
 
-  // 二、用物登记：从仓库选物品并扣减库存
+  // 二、用物登记：默认只显示当前子仓库物品，显式开启跨仓后才显示其他仓库物品
   await page.getByRole("tab", { name: "用物登记" }).click();
-  await page
+
+  const itemSelect = page
     .locator('[data-slot="select-trigger"]')
-    .filter({ hasText: "选择物品" })
-    .click();
+    .filter({ hasText: "选择物品" });
+
+  await itemSelect.click();
+  await expect(page.getByRole("option", { name: /跨仓专用物品/u })).toHaveCount(
+    0
+  );
+  await page.keyboard.press("Escape");
+
+  await page.getByRole("button", { name: "跨仓借用" }).click();
+  await itemSelect.click();
+  await expect(
+    page.getByRole("option", { name: /跨仓专用物品/u })
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
+
+  await page.getByRole("button", { name: "跨仓借用中" }).click();
+  await itemSelect.click();
   await page.getByRole("option", { name: /一次性无菌手套/u }).click();
   await page.getByRole("spinbutton", { name: "数量" }).fill("2");
   await page.getByRole("textbox", { name: "患者姓名" }).fill("测试患者");

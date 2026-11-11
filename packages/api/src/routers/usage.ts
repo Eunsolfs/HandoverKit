@@ -89,6 +89,8 @@ const usageConflict = (message: string) =>
   new ORPCError("CONFLICT", { message });
 
 const usageBaseInput = z.object({
+  /** 显式允许跨子仓库借用；默认只允许当前登记子仓库的物品。 */
+  allowCrossWarehouse: z.boolean().default(false),
   items: z
     .array(
       z.object({
@@ -110,6 +112,7 @@ const usageBaseInput = z.object({
 });
 
 interface UsageWriteOptions {
+  allowCrossWarehouse: boolean;
   matterId: string;
   subWarehouseId: string;
   items: { itemId: string; quantity: number }[];
@@ -170,6 +173,15 @@ const writeUsage = (
       if (itemRow.status !== "active") {
         throw new ORPCError("BAD_REQUEST", {
           message: `物品「${itemRow.name}」已停用，不能登记消耗`,
+        });
+      }
+
+      if (
+        !options.allowCrossWarehouse &&
+        itemRow.subWarehouseId !== options.subWarehouseId
+      ) {
+        throw new ORPCError("BAD_REQUEST", {
+          message: `物品「${itemRow.name}」不属于当前子仓库，如确需跨仓借用请使用「跨仓借用」功能`,
         });
       }
 
@@ -331,6 +343,7 @@ export const usageRouter = {
       }
 
       const usageId = writeUsage(context.db, context.user, {
+        allowCrossWarehouse: input.allowCrossWarehouse,
         backfillReason: null,
         isBackfill: false,
         items: input.items,
@@ -414,6 +427,7 @@ export const usageRouter = {
         .all();
 
       const usageId = writeUsage(context.db, context.user, {
+        allowCrossWarehouse: input.allowCrossWarehouse,
         backfillReason: input.backfillReason,
         isBackfill: true,
         items: input.items,

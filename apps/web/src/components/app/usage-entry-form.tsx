@@ -1,7 +1,12 @@
-import { PlusIcon, Trash2Icon } from "lucide-react";
+import { ArrowLeftRightIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { useState } from "react";
 import type { SubmitEvent } from "react";
 
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "@handoverkit/ui/components/alert";
 import { Button } from "@handoverkit/ui/components/button";
 import { Input } from "@handoverkit/ui/components/input";
 import { Textarea } from "@handoverkit/ui/components/textarea";
@@ -27,6 +32,7 @@ interface UsageEntryItem {
 }
 
 export interface UsageEntryValue {
+  allowCrossWarehouse: boolean;
   usedAt: string;
   usedTime: string | null;
   backfillReason: string | null;
@@ -58,6 +64,9 @@ interface UsageRow {
 const NEW_ROW: UsageRow = { itemId: null, quantity: 1 };
 
 interface UsageEntryFormProps {
+  /** 当前登记子仓库；默认只允许选择该子仓库的物品。 */
+  subWarehouseId: string;
+  subWarehouseName?: string;
   items: PickerItem[];
   defaultOperatorName: string;
   defaultUsedAt?: string;
@@ -76,9 +85,12 @@ export const UsageEntryForm = ({
   mode = "normal",
   onSubmit,
   pending = false,
+  subWarehouseId,
+  subWarehouseName,
   submitLabel = "提交登记",
 }: UsageEntryFormProps) => {
   const isBackfill = mode === "backfill";
+  const [allowCrossWarehouse, setAllowCrossWarehouse] = useState(false);
   const [patient, setPatient] = useState<PatientInfo>(EMPTY_PATIENT_INFO);
   const [rows, setRows] = useState<UsageRow[]>([NEW_ROW]);
   const [usedAt, setUsedAt] = useState(defaultUsedAt ?? toLocalDateString());
@@ -91,6 +103,40 @@ export const UsageEntryForm = ({
   const selectedIds = rows
     .map((row) => row.itemId)
     .filter((itemId): itemId is string => itemId !== null);
+
+  const currentWarehouseItems = items.filter(
+    (item) => item.subWarehouseId === subWarehouseId
+  );
+
+  const visibleItems = allowCrossWarehouse ? items : currentWarehouseItems;
+
+  const hasCrossWarehouseSelection = rows.some((row) => {
+    const selected = items.find((item) => item.id === row.itemId);
+
+    return selected !== undefined && selected.subWarehouseId !== subWarehouseId;
+  });
+
+  const toggleCrossWarehouse = () => {
+    if (!allowCrossWarehouse) {
+      setAllowCrossWarehouse(true);
+
+      return;
+    }
+
+    const nextRows = rows.filter((row) => {
+      if (row.itemId === null) {
+        return true;
+      }
+
+      return currentWarehouseItems.some((item) => item.id === row.itemId);
+    });
+
+    setRows(nextRows.length === 0 ? [NEW_ROW] : nextRows);
+    setAllowCrossWarehouse(false);
+  };
+
+  const selectedItemOf = (itemId: string | null) =>
+    items.find((item) => item.id === itemId);
 
   const updateRow = (index: number, patch: Partial<UsageRow>) => {
     setRows((current) =>
@@ -165,6 +211,7 @@ export const UsageEntryForm = ({
     const phone = patient.patientPhone.trim();
 
     onSubmit({
+      allowCrossWarehouse,
       backfillReason: isBackfill ? backfillReason.trim() : null,
       items: payloadItems,
       note: note.trim().length === 0 ? null : note.trim(),
@@ -181,23 +228,56 @@ export const UsageEntryForm = ({
   return (
     <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
       <section className="grid gap-2">
-        <div className="flex items-center justify-between gap-2">
-          <h2 className="text-sm font-medium">物品明细</h2>
-          <Button
-            disabled={pending || rows.length >= items.length}
-            onClick={() => {
-              setRows((current) => [...current, NEW_ROW]);
-            }}
-            size="sm"
-            type="button"
-            variant="outline"
-          >
-            <PlusIcon />
-            添加物品
-          </Button>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="grid gap-0.5">
+            <h2 className="text-sm font-medium">物品明细</h2>
+            <p className="text-muted-foreground text-xs">
+              默认只显示「{subWarehouseName ?? "当前子仓库"}」的物品
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              aria-pressed={allowCrossWarehouse}
+              disabled={pending}
+              onClick={toggleCrossWarehouse}
+              size="sm"
+              type="button"
+              variant={allowCrossWarehouse ? "default" : "outline"}
+            >
+              <ArrowLeftRightIcon />
+              {allowCrossWarehouse ? "跨仓借用中" : "跨仓借用"}
+            </Button>
+            <Button
+              disabled={pending || rows.length >= visibleItems.length}
+              onClick={() => {
+                setRows((current) => [...current, NEW_ROW]);
+              }}
+              size="sm"
+              type="button"
+              variant="outline"
+            >
+              <PlusIcon />
+              添加物品
+            </Button>
+          </div>
         </div>
+        {!allowCrossWarehouse && currentWarehouseItems.length === 0 ? (
+          <p className="text-muted-foreground text-xs">
+            当前子仓库暂无可用物品；如确需借用其他子仓库物品，请点击「跨仓借用」。
+          </p>
+        ) : null}
+        {hasCrossWarehouseSelection ? (
+          <Alert>
+            <ArrowLeftRightIcon />
+            <AlertTitle>正在跨仓借用物品</AlertTitle>
+            <AlertDescription>
+              所选物品不属于「{subWarehouseName ?? "当前子仓库"}
+              」，提交后将从物品所属子仓库扣减库存。
+            </AlertDescription>
+          </Alert>
+        ) : null}
         {rows.map((row, index) => {
-          const selectedItem = items.find((item) => item.id === row.itemId);
+          const selectedItem = selectedItemOf(row.itemId);
 
           return (
             <div
@@ -210,7 +290,7 @@ export const UsageEntryForm = ({
                   disabledIds={selectedIds.filter(
                     (itemId) => itemId !== row.itemId
                   )}
-                  items={items}
+                  items={visibleItems}
                   onChange={(itemId) => {
                     updateRow(index, { itemId });
                   }}

@@ -116,7 +116,20 @@ describe("sub warehouses", () => {
 
     await acceptAll(member.client, secondRecord);
 
+    const crossBlocked = await captureOrpcError(
+      member.client.usage.create({
+        items: [{ itemId: itemA.id, quantity: 2 }],
+        matterId: matter.id,
+        patientName: "住院患者",
+        patientNo: "SW2",
+        patientType: "inpatient",
+        subWarehouseId: second.id,
+        usedAt: secondRecord.recordDate,
+      })
+    );
+
     const usage = await member.client.usage.create({
+      allowCrossWarehouse: true,
       items: [{ itemId: itemA.id, quantity: 2 }],
       matterId: matter.id,
       patientName: "住院患者",
@@ -136,9 +149,14 @@ describe("sub warehouses", () => {
 
     const rows = await member.client.items.list({ matterId: matter.id });
     expect({
+      crossBlocked: crossBlocked.code,
       itemAStock: rows.find((row) => row.id === itemA.id)?.stock,
       itemBStock: rows.find((row) => row.id === itemB.id)?.stock,
-    }).toStrictEqual({ itemAStock: 8, itemBStock: 5 });
+    }).toStrictEqual({
+      crossBlocked: "BAD_REQUEST",
+      itemAStock: 8,
+      itemBStock: 5,
+    });
   });
 
   it("调拨在子仓库间移动库存，并自动为调入仓库建档", async () => {

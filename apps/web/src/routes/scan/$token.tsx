@@ -699,8 +699,11 @@ const UsagePanel = ({
 
   return (
     <UsageEntryForm
+      key={data.today.subWarehouseId}
       defaultOperatorName={operatorName}
       items={data.items}
+      subWarehouseId={data.today.subWarehouseId}
+      subWarehouseName={data.today.subWarehouseName}
       onSubmit={(value: UsageEntryValue) => {
         createMutation.mutate({
           matterId: data.matter.id,

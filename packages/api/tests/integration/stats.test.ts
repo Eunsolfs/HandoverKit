@@ -351,6 +351,7 @@ describe("stats", () => {
     await ensureAcceptedRecord(member.client, matter.id, "2026-05-06");
 
     await member.client.usage.create({
+      allowCrossWarehouse: true,
       items: [
         { itemId: mainItem.id, quantity: 2 },
         { itemId: secondItem.id, quantity: 3 },

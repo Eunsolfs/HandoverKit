@@ -10,6 +10,7 @@ export interface PickerItem {
   id: string;
   name: string;
   spec: string | null;
+  subWarehouseId: string;
   subWarehouseName?: string;
   unit: string;
   stock: number;
