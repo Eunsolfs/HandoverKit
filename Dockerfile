@@ -41,7 +41,7 @@ ENV NODE_ENV=production \
     TZ=Asia/Shanghai
 
 # Node 运行时自带完整 ICU；tzdata 提供 TZ 解析；libstdc++/libgcc 是 Node 动态依赖。
-RUN apk add --no-cache libstdc++ libgcc ca-certificates tzdata \
+RUN apk add --no-cache libstdc++ libgcc ca-certificates tzdata su-exec \
   && addgroup -S app \
   && adduser -S -G app app \
   && mkdir -p /data \
@@ -53,12 +53,16 @@ COPY --from=node-runtime /tmp/node /usr/local/bin/node
 # dist/index.mjs 提供 /rpc、/api、/api/auth 与 SPA，dist/migrate.mjs 只做迁移。
 COPY --from=build /app/apps/server/dist ./dist
 COPY --from=build /app/apps/web/dist ./dist/public
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-USER app
+# 入口脚本先以 root 修正旧数据卷权限，再通过 su-exec 降权为 app。
+USER root
 VOLUME /data
 EXPOSE 3000
 
 HEALTHCHECK --interval=10s --timeout=3s --start-period=15s --retries=3 \
   CMD ["node", "-e", "fetch('http://127.0.0.1:3000/api/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
 
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 CMD ["node", "dist/index.mjs"]

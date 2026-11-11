@@ -156,21 +156,22 @@ docker compose up -d
 
 ## 7. 常见问题
 
-| 现象                                   | 处理                                                                                                                      |
-| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `docker compose pull` 401/unauthorized | 镜像已 public；先 `docker logout ghcr.io` 再重试；若包被改回私有，执行 `docker login ghcr.io`（PAT `read:packages`）      |
-| 登录 403 / Origin 不一致               | `.env` 的 `BETTER_AUTH_URL` 与实际访问地址不一致；修改后 `docker compose up -d --force-recreate app`                      |
-| 健康检查失败                           | `ops.sh logs` 查看；常见为端口占用、数据库权限（/data 需可写）、迁移失败                                                  |
-| 端口被占用                             | 修改 `.env` 的 `APP_PORT` 后 `ops.sh restart`                                                                             |
-| 备份失败：应用未运行                   | 先 `ops.sh status`，确保 app 容器在运行                                                                                   |
-| 升级后想回退                           | `ops.sh rollback`（保留上一次 .env 镜像配置）                                                                             |
-| 忘记管理员密码                         | 用 `docker compose exec app node ...` 重置较复杂；可用备份恢复或联系维护者（当前未提供 CLI 改密，可在登录后个人中心修改） |
+| 现象                                          | 处理                                                                                                                                    |
+| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `docker compose pull` 401/unauthorized        | 镜像已 public；先 `docker logout ghcr.io` 再重试；若包被改回私有，执行 `docker login ghcr.io`（PAT `read:packages`）                    |
+| 登录 403 / Origin 不一致                      | `.env` 的 `BETTER_AUTH_URL` 与实际访问地址不一致；修改后 `docker compose up -d --force-recreate app`                                    |
+| 健康检查失败                                  | `ops.sh logs` 查看；常见为端口占用、数据库权限（/data 需可写）、迁移失败                                                                |
+| 迁移报 `attempt to write a readonly database` | 旧镜像数据卷属主与新镜像用户不一致；v1.2.4+ 入口脚本会自动修正。仍失败可先 `ops.sh rollback` 再 `ops.sh upgrade v1.2.4`，不要删除数据卷 |
+| 端口被占用                                    | 修改 `.env` 的 `APP_PORT` 后 `ops.sh restart`                                                                                           |
+| 备份失败：应用未运行                          | 先 `ops.sh status`，确保 app 容器在运行                                                                                                 |
+| 升级后想回退                                  | `ops.sh rollback`（保留上一次 .env 镜像配置）                                                                                           |
+| 忘记管理员密码                                | 用 `docker compose exec app node ...` 重置较复杂；可用备份恢复或联系维护者（当前未提供 CLI 改密，可在登录后个人中心修改）               |
 
 ## 8. 实测记录（Docker Desktop）
 
 已在 Docker Desktop 4.97 / Engine 29.9.2 / Compose v5.6.1（Windows，Linux 容器）实测：
 
-- `docker build -t handoverkit:local .`：多阶段构建成功（镜像约 296 MB / 压缩 77 MB）。
+- `docker build -t handoverkit:local .`：多阶段构建成功（v1.2.2+ 精简运行镜像约 187 MB，压缩拉取约 51 MB）。
 - `docker compose -f deploy/docker-compose.release.yml --env-file deploy/env.release.example config`：通过。
 - Release Compose 直接部署：migrate → app → `/api/health` 200、`/login` 200。
 - `ops.sh install`（本地镜像）：自动配置、迁移、启动、健康检查通过；登录 `admin` 成功、`me.get` 正常。
