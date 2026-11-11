@@ -131,6 +131,33 @@ describe("usage", () => {
     expect(listed.total).toBe(1);
   });
 
+  it("未填登记号也可登记与补登记", async () => {
+    const { gauze, matter, member } = await setup();
+    await ensureAcceptedRecord(member.client, matter.id, "2026-03-20");
+
+    const created = await member.client.usage.create({
+      items: [{ itemId: gauze.id, quantity: 1 }],
+      matterId: matter.id,
+      patientName: "无登记号患者",
+      patientType: "outpatient",
+      usedAt: "2026-03-20",
+    });
+
+    expect(created.patientNo).toBe("");
+
+    const backfilled = await member.client.usage.backfill({
+      backfillReason: "下班后补录",
+      items: [{ itemId: gauze.id, quantity: 1 }],
+      matterId: matter.id,
+      patientName: "无登记号患者",
+      patientType: "outpatient",
+      usedAt: "2026-03-20",
+      usedTime: "14:30",
+    });
+
+    expect(backfilled.patientNo).toBe("");
+  });
+
   it("库存不足整单回滚，不产生半条消耗", async () => {
     const { gauze, listItems, matter, member, needle } = await setup();
     await ensureAcceptedRecord(member.client, matter.id, "2026-03-02");

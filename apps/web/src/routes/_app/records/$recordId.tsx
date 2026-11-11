@@ -482,8 +482,11 @@ const RecordDetailPage = () => {
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium break-words">
                       {usage.patientName}（
-                      {PATIENT_TYPE_LABELS[usage.patientType]} ·{" "}
-                      {usage.patientNo}）
+                      {PATIENT_TYPE_LABELS[usage.patientType]}
+                      {usage.patientNo.length === 0
+                        ? ""
+                        : ` · ${usage.patientNo}`}
+                      ）
                     </p>
                     <p className="text-muted-foreground text-xs">
                       {itemSummary(usage.items)} · 操作员 {usage.operatorName}

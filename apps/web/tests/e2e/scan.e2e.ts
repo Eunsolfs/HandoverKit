@@ -95,7 +95,6 @@ test("扫码页完成接班核对、用物登记与交班表全链路", async ({
   await page.getByRole("option", { name: /一次性无菌手套/u }).click();
   await page.getByRole("spinbutton", { name: "数量" }).fill("2");
   await page.getByRole("textbox", { name: "患者姓名" }).fill("测试患者");
-  await page.getByRole("textbox", { name: "登记号" }).fill(`E2E${tag}`);
   await page.getByRole("button", { name: "提交用物登记" }).click();
   await expect(
     page.getByText("用物登记成功，库存已扣减", { exact: true })

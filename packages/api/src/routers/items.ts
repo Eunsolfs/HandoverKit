@@ -576,6 +576,13 @@ export const itemsRouter = {
           });
         }
 
+        // 调拨建档时复制当前产品图；图片按 item 独立存储，不能用源 item 的 URL。
+        const [sourceImage] = tx
+          .select()
+          .from(itemImage)
+          .where(eq(itemImage.itemId, source.id))
+          .all();
+
         const targetCandidates = tx
           .select()
           .from(item)
@@ -601,6 +608,7 @@ export const itemsRouter = {
             .values({
               category: source.category,
               id: randomUUID(),
+              imageUpdatedAt: sourceImage?.updatedAt ?? null,
               location: null,
               matterId: source.matterId,
               minStock: 0,
@@ -621,6 +629,43 @@ export const itemsRouter = {
           }
 
           target = createdTarget;
+
+          if (sourceImage !== undefined) {
+            tx.insert(itemImage)
+              .values({
+                data: sourceImage.data,
+                height: sourceImage.height,
+                itemId: createdTarget.id,
+                mime: sourceImage.mime,
+                updatedAt: sourceImage.updatedAt,
+                width: sourceImage.width,
+              })
+              .run();
+          }
+        } else {
+          const [targetImage] = tx
+            .select()
+            .from(itemImage)
+            .where(eq(itemImage.itemId, target.id))
+            .all();
+
+          // 目标已有自己的图片时保留，不覆盖；无图时继承源物品的当前图片。
+          if (targetImage === undefined && sourceImage !== undefined) {
+            tx.insert(itemImage)
+              .values({
+                data: sourceImage.data,
+                height: sourceImage.height,
+                itemId: target.id,
+                mime: sourceImage.mime,
+                updatedAt: sourceImage.updatedAt,
+                width: sourceImage.width,
+              })
+              .run();
+            tx.update(item)
+              .set({ imageUpdatedAt: sourceImage.updatedAt })
+              .where(eq(item.id, target.id))
+              .run();
+          }
         }
 
         const [updatedTarget] = tx

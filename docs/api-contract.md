@@ -186,6 +186,7 @@ interface UsageDto {
   backfillReason: string | null;
   patientName: string;
   patientType: "outpatient" | "inpatient";
+  /** 门诊号/住院号；未填写时为空字符串。 */
   patientNo: string;
   patientPhone: string | null;
   operatorName: string;
@@ -331,7 +332,7 @@ interface StatsOverviewDto {
 | `items.movements`   | `{ itemId }`                                                                                        | `StockMovementDto[]`（最多 100 条） | 登录（团队隔离）                                                                                |
 | `items.remove`      | `{ id }`                                                                                            | `{ ok: true }`                      | 管理员；有 usage_item / stock_movement / handover_record_item 快照时只能停用（`CONFLICT`）      |
 | `items.forceRemove` | `{ id }`                                                                                            | `{ ok: true }`                      | 管理员；清理库存流水/调拨/图片后物理删除；有 usage_item 或 handover_record_item 时仍 `CONFLICT` |
-| `items.transfer`    | `{ fromSubWarehouseId, toSubWarehouseId, itemId, quantity, note? }`                                 | `StockTransferDto`                  | 管理员；同事项、不同子仓库、双边事务扣增；调入无同名同规格物品时自动建档                        |
+| `items.transfer`    | `{ fromSubWarehouseId, toSubWarehouseId, itemId, quantity, note? }`                                 | `StockTransferDto`                  | 管理员；同事项、不同子仓库、双边事务扣增；调入无同名同规格物品时自动建档并复制源物品产品图      |
 | `items.transfers`   | `{ matterId, subWarehouseId? }`                                                                     | `StockTransferDto[]`（最近 50 条）  | 登录（团队隔离）                                                                                |
 
 ### 4.6 records（交接记录）
@@ -356,15 +357,15 @@ interface StatsOverviewDto {
 
 > `usage.backfill` 是独立补登记入口：登录即可，不要求交接记录/接班状态；必须提供 `usedAt`、`usedTime`（HH:mm）、`backfillReason`（2–300 字）与物品数量；不允许未来日期；扣减来源物品库存。
 
-| Procedure              | 入参                                                                                                                     | 返回                                  | 权限                                                                          |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------- | ----------------------------------------------------------------------------- |
-| `usage.list`           | `{ matterId?, subWarehouseId?, teamId?, from?, to?, status?, page?, pageSize? }`                                         | 分页 `UsageDto[]`                     | 登录（团队隔离）                                                              |
-| `usage.get`            | `{ id }`                                                                                                                 | `UsageDto`                            | 登录                                                                          |
-| `usage.create`         | `{ matterId, subWarehouseId?, usedAt, patientName, patientType, patientNo, patientPhone?, operatorName?, note?, items }` | `UsageDto`                            | 登录；事务扣来源库存。前置：子仓库当日记录已接收；有差异需先异常上报          |
-| `usage.backfill`       | `{ matterId, subWarehouseId?, usedAt, usedTime, backfillReason, patient..., items }`                                     | `UsageDto`（`isBackfill=true`）       | 登录；不受接班门禁限制；时间/数量/原因必填；禁止未来日期                      |
-| `usage.requestRevoke`  | `{ id, reason }`                                                                                                         | `RevokeRequestDto`                    | 记录所属团队成员                                                              |
-| `usage.pendingRevokes` | `{ teamId? }`                                                                                                            | `RevokeRequestDto[]`（含 usage 摘要） | 管理员                                                                        |
-| `usage.reviewRevoke`   | `{ requestId, approve, note? }`                                                                                          | `UsageDto`                            | 管理员；通过则恢复库存并置 revoked；驳回则 usage 恢复 active、申请置 rejected |
+| Procedure              | 入参                                                                                                                      | 返回                                  | 权限                                                                                       |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `usage.list`           | `{ matterId?, subWarehouseId?, teamId?, from?, to?, status?, page?, pageSize? }`                                          | 分页 `UsageDto[]`                     | 登录（团队隔离）                                                                           |
+| `usage.get`            | `{ id }`                                                                                                                  | `UsageDto`                            | 登录                                                                                       |
+| `usage.create`         | `{ matterId, subWarehouseId?, usedAt, patientName, patientType, patientNo?, patientPhone?, operatorName?, note?, items }` | `UsageDto`                            | 登录；事务扣来源库存。前置：子仓库当日记录已接收；有差异需先异常上报；未填登记号存空字符串 |
+| `usage.backfill`       | `{ matterId, subWarehouseId?, usedAt, usedTime, backfillReason, patient..., items }`                                      | `UsageDto`（`isBackfill=true`）       | 登录；不受接班门禁限制；时间/数量/原因必填；禁止未来日期                                   |
+| `usage.requestRevoke`  | `{ id, reason }`                                                                                                          | `RevokeRequestDto`                    | 记录所属团队成员                                                                           |
+| `usage.pendingRevokes` | `{ teamId? }`                                                                                                             | `RevokeRequestDto[]`（含 usage 摘要） | 管理员                                                                                     |
+| `usage.reviewRevoke`   | `{ requestId, approve, note? }`                                                                                           | `UsageDto`                            | 管理员；通过则恢复库存并置 revoked；驳回则 usage 恢复 active、申请置 rejected              |
 
 ### 4.8 exceptions
 

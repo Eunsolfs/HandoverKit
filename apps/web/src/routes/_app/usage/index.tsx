@@ -127,7 +127,8 @@ const buildUsageColumns = (
       <div className="grid gap-0.5">
         <span className="font-medium">{usage.patientName}</span>
         <span className="text-muted-foreground text-xs">
-          {PATIENT_TYPE_LABELS[usage.patientType]} · {usage.patientNo}
+          {PATIENT_TYPE_LABELS[usage.patientType]}
+          {usage.patientNo.length === 0 ? "" : ` · ${usage.patientNo}`}
         </span>
       </div>
     ),

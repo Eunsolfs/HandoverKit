@@ -20,7 +20,6 @@ export interface PatientInfo {
 
 export interface PatientFieldErrors {
   patientName?: string;
-  patientNo?: string;
   patientPhone?: string;
 }
 
@@ -101,7 +100,7 @@ export const PatientFields = ({
       )}
     </FormField>
 
-    <FormField error={errors.patientNo} id="patient-no" label="登记号" required>
+    <FormField hint="选填，可填门诊号 / 住院号" id="patient-no" label="登记号">
       {(field) => (
         <Input
           {...field}
@@ -146,10 +145,6 @@ export const validatePatientInfo = (value: PatientInfo): PatientFieldErrors => {
 
   if (value.patientName.trim().length === 0) {
     errors.patientName = "请填写患者姓名";
-  }
-
-  if (value.patientNo.trim().length === 0) {
-    errors.patientNo = "请填写登记号";
   }
 
   const phone = value.patientPhone.trim();

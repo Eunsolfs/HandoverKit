@@ -2,7 +2,7 @@
 
 > 面向科室/院区的用物与交接记录系统：扫码交接、子仓库库存、调拨、补登记、数据统计。
 >
-> 当前稳定版本：**v1.2.2**
+> 当前稳定版本：**v1.2.3**
 
 [![stack](https://img.shields.io/badge/stack-Vite%2B%20%7C%20React%2019%20%7C%20Hono%20%7C%20oRPC%20%7C%20SQLite-0d9488)](https://viteplus.dev)
 [![license](https://img.shields.io/badge/license-MIT-0d9488)](#license)

@@ -102,7 +102,8 @@ const usageBaseInput = z.object({
   note: z.string().trim().max(300).nullish(),
   operatorName: z.string().trim().max(40).optional(),
   patientName: z.string().trim().min(1).max(40),
-  patientNo: z.string().trim().min(1).max(40),
+  // 门诊号/住院号按实际业务可为空；数据库继续存空字符串以保持现有 NOT NULL 结构。
+  patientNo: z.string().trim().max(40).default(""),
   patientPhone: z.string().trim().max(20).nullish(),
   patientType: z.enum(["outpatient", "inpatient"]),
   usedAt: calendarDateSchema,

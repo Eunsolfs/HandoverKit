@@ -171,22 +171,22 @@ Better Auth 负责会话与密码；业务字段直接加在同一张表。
 | is_backfill      | integer(bool) | NOT NULL default false | 是否补登记           |
 | backfill_reason  | text          | 补录时必填 2–300 字    | 补录原因             |
 
-| 字段                  | 类型                                                         | 说明                     |
-| --------------------- | ------------------------------------------------------------ | ------------------------ |
-| id                    | text PK                                                      |                          |
-| matterId              | text NOT NULL FK matter.id                                   |                          |
-| recordId              | text NULL FK handover_record.id                              | 关联当日交接记录（可空） |
-| usedAt                | text NOT NULL                                                | 使用日期 YYYY-MM-DD      |
-| patientName           | text NOT NULL                                                | 患者姓名                 |
-| patientType           | text NOT NULL CHECK in ('outpatient','inpatient')            | 门诊/住院                |
-| patientNo             | text NOT NULL                                                | 登记号                   |
-| patientPhone          | text NULL                                                    | 电话（可选）             |
-| operatorUserId        | text NOT NULL                                                | 操作员账号               |
-| operatorName          | text NOT NULL                                                | 操作员姓名快照           |
-| note                  | text NULL                                                    | 备注                     |
-| status                | text NOT NULL CHECK in ('active','revoke_pending','revoked') | 状态                     |
-| revokedAt             | integer ms NULL                                              | 撤销生效时间             |
-| createdAt / updatedAt | integer ms NOT NULL                                          |                          |
+| 字段                  | 类型                                                         | 说明                       |
+| --------------------- | ------------------------------------------------------------ | -------------------------- |
+| id                    | text PK                                                      |                            |
+| matterId              | text NOT NULL FK matter.id                                   |                            |
+| recordId              | text NULL FK handover_record.id                              | 关联当日交接记录（可空）   |
+| usedAt                | text NOT NULL                                                | 使用日期 YYYY-MM-DD        |
+| patientName           | text NOT NULL                                                | 患者姓名                   |
+| patientType           | text NOT NULL CHECK in ('outpatient','inpatient')            | 门诊/住院                  |
+| patientNo             | text NOT NULL                                                | 登记号；未填写时为空字符串 |
+| patientPhone          | text NULL                                                    | 电话（可选）               |
+| operatorUserId        | text NOT NULL                                                | 操作员账号                 |
+| operatorName          | text NOT NULL                                                | 操作员姓名快照             |
+| note                  | text NULL                                                    | 备注                       |
+| status                | text NOT NULL CHECK in ('active','revoke_pending','revoked') | 状态                       |
+| revokedAt             | integer ms NULL                                              | 撤销生效时间               |
+| createdAt / updatedAt | integer ms NOT NULL                                          |                            |
 
 ### 2.9 usage_item（消耗明细）
 
