@@ -11,6 +11,7 @@ import {
   handoverRecordItem,
   item,
   itemImage,
+  matter,
   stockMovement,
   stockTransfer,
   subWarehouse,
@@ -22,6 +23,7 @@ import {
   assertMatterActive,
   assertSubWarehouseAccess,
   resolveSubWarehouseId,
+  resolveTeamId,
 } from "#src/authz.ts";
 import type { SubWarehouseAccess } from "#src/authz.ts";
 import type { Profile } from "#src/context.ts";
@@ -386,6 +388,60 @@ export const itemsRouter = {
       return rows.map((row) =>
         toItemDto(row, names.get(row.subWarehouseId) ?? "")
       );
+    }),
+
+  lowStock: adminProcedure
+    .input(
+      z.object({
+        matterId: z.string().min(1).optional(),
+        teamId: z.string().min(1).optional(),
+      })
+    )
+    .handler(async ({ context, input }) => {
+      const teamId = await resolveTeamId(
+        context.db,
+        context.user,
+        input.teamId
+      );
+
+      if (input.matterId !== undefined) {
+        await assertMatterAccess(context.db, context.user, input.matterId);
+      }
+
+      const rows = context.db
+        .select({
+          item,
+          matterName: matter.name,
+          subWarehouseName: subWarehouse.name,
+        })
+        .from(item)
+        .innerJoin(matter, eq(item.matterId, matter.id))
+        .innerJoin(subWarehouse, eq(item.subWarehouseId, subWarehouse.id))
+        .where(
+          and(
+            eq(matter.teamId, teamId),
+            eq(item.status, "active"),
+            sql`${item.stock} <= ${item.minStock}`,
+            ...(input.matterId === undefined
+              ? []
+              : [eq(item.matterId, input.matterId)])
+          )
+        )
+        .orderBy(matter.name, subWarehouse.name, item.name)
+        .all();
+
+      return rows.map(({ item: row, matterName, subWarehouseName }) => ({
+        id: row.id,
+        matterId: row.matterId,
+        matterName,
+        minStock: row.minStock,
+        name: row.name,
+        spec: row.spec,
+        stock: row.stock,
+        subWarehouseId: row.subWarehouseId,
+        subWarehouseName,
+        unit: row.unit,
+      }));
     }),
 
   movements: protectedProcedure

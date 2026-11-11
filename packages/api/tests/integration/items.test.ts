@@ -100,6 +100,46 @@ describe("items", () => {
     expect(duplicate.code).toBe("CONFLICT");
   });
 
+  it("低库存接口只返回库存低于或等于最低库存的物品", async () => {
+    const { matter, teamAdmin } = await setup();
+
+    const low = await teamAdmin.client.items.create({
+      matterId: matter.id,
+      minStock: 5,
+      name: "接口低库存物品",
+      stock: 2,
+      unit: "个",
+    });
+
+    await teamAdmin.client.items.create({
+      matterId: matter.id,
+      minStock: 5,
+      name: "接口正常库存物品",
+      stock: 20,
+      unit: "个",
+    });
+
+    const lowStock = await teamAdmin.client.items.lowStock({});
+    expect(lowStock).toHaveLength(1);
+    expect(lowStock[0]).toMatchObject({
+      id: low.id,
+      matterId: matter.id,
+      matterName: matter.name,
+      name: "接口低库存物品",
+      stock: 2,
+      subWarehouseName: "主仓库",
+    });
+
+    const otherTeam = createTeamFixture(db);
+
+    const otherAdmin = await createTestUser({
+      role: "team_admin",
+      teamId: otherTeam.id,
+    });
+
+    await expect(otherAdmin.client.items.lowStock({})).resolves.toHaveLength(0);
+  });
+
   it("入库与盘点写入对应流水", async () => {
     const { matter, teamAdmin } = await setup();
 

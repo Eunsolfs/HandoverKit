@@ -14,8 +14,11 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
 import { Route as AppScanRouteImport } from './routes/_app/scan'
 import { Route as ScanTokenRouteImport } from './routes/scan/$token'
+import { Route as AppAdminExceptionsRouteImport } from './routes/_app/admin/exceptions'
 import { Route as AppAdminItemsRouteImport } from './routes/_app/admin/items'
+import { Route as AppAdminLowStockRouteImport } from './routes/_app/admin/low-stock'
 import { Route as AppAdminMattersRouteImport } from './routes/_app/admin/matters'
+import { Route as AppAdminRevokesRouteImport } from './routes/_app/admin/revokes'
 import { Route as AppAdminStatsRouteImport } from './routes/_app/admin/stats'
 import { Route as AppAdminTeamsRouteImport } from './routes/_app/admin/teams'
 import { Route as AppAdminUsersRouteImport } from './routes/_app/admin/users'
@@ -47,14 +50,29 @@ const ScanTokenRoute = ScanTokenRouteImport.update({
   path: '/scan/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppAdminExceptionsRoute = AppAdminExceptionsRouteImport.update({
+  id: '/admin/exceptions',
+  path: '/admin/exceptions',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppAdminItemsRoute = AppAdminItemsRouteImport.update({
   id: '/admin/items',
   path: '/admin/items',
   getParentRoute: () => AppRoute,
 } as any)
+const AppAdminLowStockRoute = AppAdminLowStockRouteImport.update({
+  id: '/admin/low-stock',
+  path: '/admin/low-stock',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppAdminMattersRoute = AppAdminMattersRouteImport.update({
   id: '/admin/matters',
   path: '/admin/matters',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAdminRevokesRoute = AppAdminRevokesRouteImport.update({
+  id: '/admin/revokes',
+  path: '/admin/revokes',
   getParentRoute: () => AppRoute,
 } as any)
 const AppAdminStatsRoute = AppAdminStatsRouteImport.update({
@@ -93,8 +111,11 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/scan': typeof AppScanRoute
   '/scan/$token': typeof ScanTokenRoute
+  '/admin/exceptions': typeof AppAdminExceptionsRoute
   '/admin/items': typeof AppAdminItemsRoute
+  '/admin/low-stock': typeof AppAdminLowStockRoute
   '/admin/matters': typeof AppAdminMattersRoute
+  '/admin/revokes': typeof AppAdminRevokesRoute
   '/admin/stats': typeof AppAdminStatsRoute
   '/admin/teams': typeof AppAdminTeamsRoute
   '/admin/users': typeof AppAdminUsersRoute
@@ -107,8 +128,11 @@ export interface FileRoutesByTo {
   '/scan': typeof AppScanRoute
   '/scan/$token': typeof ScanTokenRoute
   '/': typeof AppIndexRoute
+  '/admin/exceptions': typeof AppAdminExceptionsRoute
   '/admin/items': typeof AppAdminItemsRoute
+  '/admin/low-stock': typeof AppAdminLowStockRoute
   '/admin/matters': typeof AppAdminMattersRoute
+  '/admin/revokes': typeof AppAdminRevokesRoute
   '/admin/stats': typeof AppAdminStatsRoute
   '/admin/teams': typeof AppAdminTeamsRoute
   '/admin/users': typeof AppAdminUsersRoute
@@ -123,8 +147,11 @@ export interface FileRoutesById {
   '/_app/scan': typeof AppScanRoute
   '/scan/$token': typeof ScanTokenRoute
   '/_app/': typeof AppIndexRoute
+  '/_app/admin/exceptions': typeof AppAdminExceptionsRoute
   '/_app/admin/items': typeof AppAdminItemsRoute
+  '/_app/admin/low-stock': typeof AppAdminLowStockRoute
   '/_app/admin/matters': typeof AppAdminMattersRoute
+  '/_app/admin/revokes': typeof AppAdminRevokesRoute
   '/_app/admin/stats': typeof AppAdminStatsRoute
   '/_app/admin/teams': typeof AppAdminTeamsRoute
   '/_app/admin/users': typeof AppAdminUsersRoute
@@ -139,8 +166,11 @@ export interface FileRouteTypes {
     | '/login'
     | '/scan'
     | '/scan/$token'
+    | '/admin/exceptions'
     | '/admin/items'
+    | '/admin/low-stock'
     | '/admin/matters'
+    | '/admin/revokes'
     | '/admin/stats'
     | '/admin/teams'
     | '/admin/users'
@@ -153,8 +183,11 @@ export interface FileRouteTypes {
     | '/scan'
     | '/scan/$token'
     | '/'
+    | '/admin/exceptions'
     | '/admin/items'
+    | '/admin/low-stock'
     | '/admin/matters'
+    | '/admin/revokes'
     | '/admin/stats'
     | '/admin/teams'
     | '/admin/users'
@@ -168,8 +201,11 @@ export interface FileRouteTypes {
     | '/_app/scan'
     | '/scan/$token'
     | '/_app/'
+    | '/_app/admin/exceptions'
     | '/_app/admin/items'
+    | '/_app/admin/low-stock'
     | '/_app/admin/matters'
+    | '/_app/admin/revokes'
     | '/_app/admin/stats'
     | '/_app/admin/teams'
     | '/_app/admin/users'
@@ -221,6 +257,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ScanTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_app/admin/exceptions': {
+      id: '/_app/admin/exceptions'
+      path: '/admin/exceptions'
+      fullPath: '/admin/exceptions'
+      preLoaderRoute: typeof AppAdminExceptionsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/admin/items': {
       id: '/_app/admin/items'
       path: '/admin/items'
@@ -228,11 +271,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAdminItemsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/admin/low-stock': {
+      id: '/_app/admin/low-stock'
+      path: '/admin/low-stock'
+      fullPath: '/admin/low-stock'
+      preLoaderRoute: typeof AppAdminLowStockRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/admin/matters': {
       id: '/_app/admin/matters'
       path: '/admin/matters'
       fullPath: '/admin/matters'
       preLoaderRoute: typeof AppAdminMattersRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/admin/revokes': {
+      id: '/_app/admin/revokes'
+      path: '/admin/revokes'
+      fullPath: '/admin/revokes'
+      preLoaderRoute: typeof AppAdminRevokesRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/admin/stats': {
@@ -283,8 +340,11 @@ declare module '@tanstack/react-router' {
 interface AppRouteChildren {
   AppScanRoute: typeof AppScanRoute
   AppIndexRoute: typeof AppIndexRoute
+  AppAdminExceptionsRoute: typeof AppAdminExceptionsRoute
   AppAdminItemsRoute: typeof AppAdminItemsRoute
+  AppAdminLowStockRoute: typeof AppAdminLowStockRoute
   AppAdminMattersRoute: typeof AppAdminMattersRoute
+  AppAdminRevokesRoute: typeof AppAdminRevokesRoute
   AppAdminStatsRoute: typeof AppAdminStatsRoute
   AppAdminTeamsRoute: typeof AppAdminTeamsRoute
   AppAdminUsersRoute: typeof AppAdminUsersRoute
@@ -296,8 +356,11 @@ interface AppRouteChildren {
 const AppRouteChildren: AppRouteChildren = {
   AppScanRoute: AppScanRoute,
   AppIndexRoute: AppIndexRoute,
+  AppAdminExceptionsRoute: AppAdminExceptionsRoute,
   AppAdminItemsRoute: AppAdminItemsRoute,
+  AppAdminLowStockRoute: AppAdminLowStockRoute,
   AppAdminMattersRoute: AppAdminMattersRoute,
+  AppAdminRevokesRoute: AppAdminRevokesRoute,
   AppAdminStatsRoute: AppAdminStatsRoute,
   AppAdminTeamsRoute: AppAdminTeamsRoute,
   AppAdminUsersRoute: AppAdminUsersRoute,

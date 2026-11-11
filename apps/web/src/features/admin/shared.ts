@@ -20,6 +20,12 @@ export type ItemDto = ClientOutputs["items"]["list"][number];
 
 export type StockMovementDto = ClientOutputs["items"]["movements"][number];
 
+export type LowStockItemDto = ClientOutputs["items"]["lowStock"][number];
+
+export type PendingRevokeDto = ClientOutputs["usage"]["pendingRevokes"][number];
+
+export type ExceptionDto = ClientOutputs["exceptions"]["list"]["items"][number];
+
 export type StatsOverviewDto = ClientOutputs["stats"]["overview"];
 
 export type StatsPeriod = StatsOverviewDto["range"]["period"];

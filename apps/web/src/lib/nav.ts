@@ -3,7 +3,10 @@ import {
   BoxesIcon,
   ClipboardListIcon,
   LayoutDashboardIcon,
+  PackageXIcon,
   QrCodeIcon,
+  TriangleAlertIcon,
+  Undo2Icon,
   UsersIcon,
   UsersRoundIcon,
 } from "lucide-react";
@@ -51,6 +54,9 @@ const adminSection: AppNavSection = {
   items: [
     { icon: BoxesIcon, label: "物品库存", path: "/admin/items" },
     { icon: BarChart3Icon, label: "数据统计", path: "/admin/stats" },
+    { icon: Undo2Icon, label: "撤销审批", path: "/admin/revokes" },
+    { icon: TriangleAlertIcon, label: "异常事件", path: "/admin/exceptions" },
+    { icon: PackageXIcon, label: "低库存", path: "/admin/low-stock" },
   ],
 };
 

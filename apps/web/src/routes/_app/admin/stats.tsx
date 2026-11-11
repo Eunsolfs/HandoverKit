@@ -11,6 +11,7 @@ import {
   Undo2Icon,
 } from "lucide-react";
 import { useState } from "react";
+import type { ReactNode } from "react";
 
 import { Button } from "@handoverkit/ui/components/button";
 import {
@@ -30,6 +31,7 @@ import {
 } from "@handoverkit/ui/components/select";
 import { cn } from "@handoverkit/ui/lib/utils";
 
+import { AppLink } from "#src/components/app/app-link.tsx";
 import { ButtonLink } from "#src/components/app/button-link.tsx";
 import { DataTable } from "#src/components/app/data-table.tsx";
 import type { DataTableColumn } from "#src/components/app/data-table.tsx";
@@ -125,6 +127,21 @@ const STATS_COLUMNS: DataTableColumn<StatsOverviewDto["byItem"][number]>[] = [
     key: "subWarehouses",
   },
 ];
+
+const StatCardLink = ({
+  children,
+  href,
+}: {
+  children: ReactNode;
+  href: string;
+}) => (
+  <AppLink
+    className="focus-visible:ring-ring block rounded-xl focus-visible:ring-2 focus-visible:outline-none"
+    href={href}
+  >
+    {children}
+  </AppLink>
+);
 
 const shiftAnchor = (
   anchor: string,
@@ -340,46 +357,58 @@ const StatsPageContent = () => {
       </div>
 
       <div className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-3 xl:grid-cols-6">
-        <StatCard
-          hint={rangeLabel}
-          icon={BoxesIcon}
-          label="消耗总量"
-          value={overview.totals.quantity}
-        />
-        <StatCard
-          icon={LayersIcon}
-          label="消耗品类数"
-          tone="info"
-          value={overview.totals.itemKinds}
-        />
-        <StatCard
-          hint={`已接收 ${overview.totals.acceptedCount} 条记录`}
-          icon={ClipboardListIcon}
-          label="使用记录数"
-          tone="success"
-          value={overview.totals.usageCount}
-        />
-        <StatCard
-          hint="待审核撤销申请"
-          icon={Undo2Icon}
-          label="待审批撤销"
-          tone="warning"
-          value={overview.alerts.pendingRevocations}
-        />
-        <StatCard
-          hint="未解决的异常事件"
-          icon={TriangleAlertIcon}
-          label="未解决异常"
-          tone="danger"
-          value={overview.alerts.openExceptions}
-        />
-        <StatCard
-          hint="库存低于或等于最低库存"
-          icon={PackageXIcon}
-          label="低库存物品"
-          tone="warning"
-          value={overview.alerts.lowStockItems.length}
-        />
+        <StatCardLink href="/usage">
+          <StatCard
+            hint={rangeLabel}
+            icon={BoxesIcon}
+            label="消耗总量"
+            value={overview.totals.quantity}
+          />
+        </StatCardLink>
+        <StatCardLink href="/usage">
+          <StatCard
+            icon={LayersIcon}
+            label="消耗品类数"
+            tone="info"
+            value={overview.totals.itemKinds}
+          />
+        </StatCardLink>
+        <StatCardLink href="/usage">
+          <StatCard
+            hint={`已接收 ${overview.totals.acceptedCount} 条记录`}
+            icon={ClipboardListIcon}
+            label="使用记录数"
+            tone="success"
+            value={overview.totals.usageCount}
+          />
+        </StatCardLink>
+        <StatCardLink href="/admin/revokes">
+          <StatCard
+            hint="待审核撤销申请"
+            icon={Undo2Icon}
+            label="待审批撤销"
+            tone="warning"
+            value={overview.alerts.pendingRevocations}
+          />
+        </StatCardLink>
+        <StatCardLink href="/admin/exceptions">
+          <StatCard
+            hint="未解决的异常事件"
+            icon={TriangleAlertIcon}
+            label="未解决异常"
+            tone="danger"
+            value={overview.alerts.openExceptions}
+          />
+        </StatCardLink>
+        <StatCardLink href="/admin/low-stock">
+          <StatCard
+            hint="库存低于或等于最低库存"
+            icon={PackageXIcon}
+            label="低库存物品"
+            tone="warning"
+            value={overview.alerts.lowStockItems.length}
+          />
+        </StatCardLink>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
