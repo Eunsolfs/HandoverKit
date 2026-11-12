@@ -80,8 +80,8 @@ export const ItemPicker = ({
     }}
     value={value}
   >
-    <SelectTrigger className="w-full">
-      <SelectValue placeholder={placeholder} />
+    <SelectTrigger className="w-full min-w-0 overflow-hidden">
+      <SelectValue className="min-w-0" placeholder={placeholder} />
     </SelectTrigger>
     <SelectContent className="w-[min(92vw,36rem)] max-w-[calc(100vw-1rem)]">
       {items.map((item) => (

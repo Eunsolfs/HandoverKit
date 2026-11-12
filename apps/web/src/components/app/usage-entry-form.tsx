@@ -303,8 +303,16 @@ export const UsageEntryForm = ({
                     来源仓库：{selectedItem.subWarehouseName ?? "其他子仓库"}
                   </p>
                 ) : null}
+                {selectedItem === undefined ? null : (
+                  <p className="text-muted-foreground mt-1 text-xs break-words">
+                    已选：{selectedItem.name}
+                    {selectedItem.spec === null
+                      ? ""
+                      : ` · ${selectedItem.spec}`}
+                  </p>
+                )}
               </div>
-              <div className="ml-auto flex items-center gap-2 sm:ml-0">
+              <div className="flex w-full items-center justify-end gap-2 sm:ml-0 sm:w-auto">
                 <QuantityStepper
                   disabled={pending}
                   label="数量"
