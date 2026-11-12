@@ -295,7 +295,14 @@ export const UsageEntryForm = ({
                     updateRow(index, { itemId });
                   }}
                   value={row.itemId}
+                  warehousePosition={allowCrossWarehouse ? "prefix" : "none"}
                 />
+                {selectedItem !== undefined &&
+                selectedItem.subWarehouseId !== subWarehouseId ? (
+                  <p className="text-info mt-1 text-xs">
+                    来源仓库：{selectedItem.subWarehouseName ?? "其他子仓库"}
+                  </p>
+                ) : null}
               </div>
               <div className="ml-auto flex items-center gap-2 sm:ml-0">
                 <QuantityStepper

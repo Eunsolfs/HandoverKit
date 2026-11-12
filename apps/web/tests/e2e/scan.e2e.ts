@@ -113,10 +113,14 @@ test("扫码页完成接班核对、用物登记与交班表全链路", async ({
 
   await page.getByRole("button", { name: "跨仓借用" }).click();
   await itemSelect.click();
-  await expect(
-    page.getByRole("option", { name: /跨仓专用物品/u })
-  ).toBeVisible();
-  await page.keyboard.press("Escape");
+
+  const crossWarehouseOption = page.getByRole("option", {
+    name: /跨仓专用物品/u,
+  });
+
+  await expect(crossWarehouseOption).toBeVisible();
+  await crossWarehouseOption.click();
+  await expect(page.getByText("来源仓库：跨仓测试仓库")).toBeVisible();
 
   await page.getByRole("button", { name: "跨仓借用中" }).click();
   await itemSelect.click();

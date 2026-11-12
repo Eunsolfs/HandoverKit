@@ -18,6 +18,8 @@ export interface PickerItem {
 
 const EMPTY_DISABLED_IDS: string[] = [];
 
+type WarehousePosition = "none" | "prefix" | "suffix";
+
 interface ItemPickerProps {
   items: PickerItem[];
   value: string | null;
@@ -26,13 +28,28 @@ interface ItemPickerProps {
   placeholder?: string;
   disabled?: boolean;
   id?: string;
+  /**
+   * 物品名较长时，手机端会先截断末尾的仓库名。
+   * 跨仓模式把仓库放到名称前，默认模式不重复展示同一仓库。
+   */
+  warehousePosition?: WarehousePosition;
 }
 
-const itemLabel = (item: PickerItem): string => {
-  const base = item.spec === null ? item.name : `${item.name} · ${item.spec}`;
+const itemBaseLabel = (item: PickerItem): string =>
+  item.spec === null ? item.name : `${item.name} · ${item.spec}`;
 
-  return item.subWarehouseName === undefined
-    ? base
+const itemLabel = (
+  item: PickerItem,
+  warehousePosition: WarehousePosition
+): string => {
+  const base = itemBaseLabel(item);
+
+  if (warehousePosition === "none" || item.subWarehouseName === undefined) {
+    return base;
+  }
+
+  return warehousePosition === "prefix"
+    ? `【${item.subWarehouseName}】${base}`
     : `${base} · ${item.subWarehouseName}`;
 };
 
@@ -45,12 +62,13 @@ export const ItemPicker = ({
   onChange,
   placeholder = "选择物品",
   value,
+  warehousePosition = "suffix",
 }: ItemPickerProps) => (
   <Select
     disabled={disabled}
     id={id}
     items={items.map((item) => ({
-      label: `${itemLabel(item)}（库存 ${item.stock} ${item.unit}）`,
+      label: `${itemLabel(item, warehousePosition)}（库存 ${item.stock} ${item.unit}）`,
       value: item.id,
     }))}
     onValueChange={(next: string | null) => {
@@ -72,11 +90,19 @@ export const ItemPicker = ({
           key={item.id}
           value={item.id}
         >
-          {itemLabel(item)}
-          <span className="text-muted-foreground ml-1 text-xs">
-            库存 {item.stock} {item.unit}
-            {item.stock <= 0 ? "（库存不足）" : ""}
-          </span>
+          <div className="grid min-w-0 gap-0.5 py-0.5">
+            {warehousePosition === "prefix" &&
+            item.subWarehouseName !== undefined ? (
+              <span className="text-info text-xs font-semibold">
+                {item.subWarehouseName}
+              </span>
+            ) : null}
+            <span className="break-words">{itemBaseLabel(item)}</span>
+            <span className="text-muted-foreground text-xs">
+              库存 {item.stock} {item.unit}
+              {item.stock <= 0 ? "（库存不足）" : ""}
+            </span>
+          </div>
         </SelectItem>
       ))}
     </SelectContent>
