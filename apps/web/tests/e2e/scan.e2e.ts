@@ -32,10 +32,20 @@ const checkItem = async (page: Page, itemName: string) => {
   await expect(checkbox).toBeChecked();
 };
 
+const quickCheckItem = async (page: Page, itemName: string) => {
+  await page
+    .getByRole("button", { name: `按应有数量核对 ${itemName}` })
+    .click();
+  await expect(
+    page.getByRole("checkbox", { name: `已核对 ${itemName}` })
+  ).toBeChecked();
+};
+
 test("扫码页完成接班核对、用物登记与交班表全链路", async ({
   context,
   page,
 }) => {
+  await page.setViewportSize({ height: 844, width: 390 });
   const tag = uniqueSuffix();
   const { client, cookie } = await login();
 
@@ -92,8 +102,8 @@ test("扫码页完成接班核对、用物登记与交班表全链路", async ({
   await expect(page.getByText("2 种物品")).toBeVisible();
 
   // 一、接班核对：逐项勾选后确认接收
-  await checkItem(page, "一次性无菌手套");
-  await checkItem(page, "碘伏消毒液");
+  await quickCheckItem(page, "一次性无菌手套");
+  await quickCheckItem(page, "碘伏消毒液");
   await page.getByRole("button", { name: "确认接收" }).click();
   await expect(page.getByText("已完成接班核对", { exact: true })).toBeVisible();
   await expect(page.getByText("已接收")).toBeVisible();
@@ -134,8 +144,8 @@ test("扫码页完成接班核对、用物登记与交班表全链路", async ({
 
   // 三、交班表：再次逐项核对后提交
   await page.getByRole("tab", { name: "交班表" }).click();
-  await checkItem(page, "一次性无菌手套");
-  await checkItem(page, "碘伏消毒液");
+  await quickCheckItem(page, "一次性无菌手套");
+  await quickCheckItem(page, "碘伏消毒液");
   await page.getByRole("button", { name: "提交交班表" }).click();
   await expect(page.getByText("交班表已提交", { exact: true })).toBeVisible();
   await expect(page.getByRole("alert")).toContainText("今日交班表已提交");

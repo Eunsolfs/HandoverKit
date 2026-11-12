@@ -1,5 +1,7 @@
+import { CheckCheckIcon } from "lucide-react";
 import { useState } from "react";
 
+import { Button } from "@handoverkit/ui/components/button";
 import { Checkbox } from "@handoverkit/ui/components/checkbox";
 import {
   Dialog,
@@ -8,6 +10,7 @@ import {
   DialogTitle,
 } from "@handoverkit/ui/components/dialog";
 import { Input } from "@handoverkit/ui/components/input";
+import { cn } from "@handoverkit/ui/lib/utils";
 
 export interface ChecklistSourceItem {
   imageUrl?: string | null;
@@ -141,7 +144,13 @@ export const ChecklistForm = ({
       const itemNoteId = `checklist-note-${item.itemId}`;
 
       return (
-        <li className="rounded-lg border p-3" key={item.itemId}>
+        <li
+          className={cn(
+            "rounded-lg border p-3 transition-colors",
+            line.checked && "border-success/30 bg-success/5"
+          )}
+          key={item.itemId}
+        >
           <div className="flex items-start gap-2">
             <span className="flex h-11 w-9 shrink-0 items-start justify-center pt-0.5 sm:w-8">
               <Checkbox
@@ -154,9 +163,31 @@ export const ChecklistForm = ({
               />
             </span>
             <div className="grid min-w-0 flex-1 gap-1">
-              <p className="text-sm leading-snug font-medium break-words">
-                {item.itemName}
-              </p>
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <p className="min-w-0 flex-1 text-sm leading-snug font-medium break-words">
+                  {item.itemName}
+                </p>
+                <Button
+                  aria-label={`按应有数量核对 ${item.itemName}`}
+                  className="shrink-0"
+                  disabled={disabled}
+                  onClick={() => {
+                    onChange(
+                      patchLine(lines, item.itemId, {
+                        actualQty: item.expectedQty,
+                        checked: true,
+                        note: "",
+                      })
+                    );
+                  }}
+                  size="xs"
+                  type="button"
+                  variant="outline"
+                >
+                  <CheckCheckIcon />
+                  按应有核对
+                </Button>
+              </div>
               <p className="text-muted-foreground text-xs">
                 {item.itemSpec === null ? "" : `${item.itemSpec} · `}
                 应有 {item.expectedQty} {item.unit}
