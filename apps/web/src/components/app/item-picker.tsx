@@ -83,14 +83,14 @@ export const ItemPicker = ({
     <SelectTrigger className="w-full">
       <SelectValue placeholder={placeholder} />
     </SelectTrigger>
-    <SelectContent>
+    <SelectContent className="w-[min(92vw,36rem)] max-w-[calc(100vw-1rem)]">
       {items.map((item) => (
         <SelectItem
           disabled={disabledIds.includes(item.id) || item.stock <= 0}
           key={item.id}
           value={item.id}
         >
-          <div className="grid min-w-0 gap-0.5 py-0.5">
+          <div className="grid min-w-0 gap-0.5 py-0.5 whitespace-normal">
             {warehousePosition === "prefix" &&
             item.subWarehouseName !== undefined ? (
               <span className="text-info text-xs font-semibold">

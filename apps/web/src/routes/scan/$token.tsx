@@ -747,7 +747,7 @@ const ScanPage = () => {
 
   if (scanQuery.isPending) {
     return (
-      <div className="mx-auto w-full max-w-md px-4 py-6">
+      <div className="mx-auto w-full max-w-md px-4 py-6 lg:max-w-4xl">
         <PageSkeleton />
       </div>
     );
@@ -755,7 +755,7 @@ const ScanPage = () => {
 
   if (scanQuery.isError) {
     return (
-      <div className="mx-auto flex min-h-svh w-full max-w-md flex-col px-4 py-6">
+      <div className="mx-auto flex min-h-svh w-full max-w-md flex-col px-4 py-6 lg:max-w-4xl">
         <AppBrand />
         <div className="mt-8">
           <ErrorState
@@ -780,7 +780,7 @@ const ScanPage = () => {
   const operatorName = me.data?.user.name ?? "";
 
   return (
-    <div className="mx-auto flex min-h-svh w-full max-w-md flex-col">
+    <div className="mx-auto flex min-h-svh w-full max-w-md flex-col lg:max-w-4xl">
       <header className="bg-background/90 sticky top-0 z-20 border-b px-4 py-3 backdrop-blur">
         <div className="flex items-center justify-between gap-2">
           <AppBrand />
