@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import { describe, expect, it } from "vite-plus/test";
 
 import {
@@ -156,6 +158,34 @@ describe("usage", () => {
     });
 
     expect(backfilled.patientNo).toBe("");
+  });
+
+  it("同一提交幂等键重复提交只扣一次库存", async () => {
+    const { gauze, listItems, matter, member } = await setup();
+    await ensureAcceptedRecord(member.client, matter.id, "2026-03-21");
+
+    const clientRequestId = randomUUID();
+
+    const payload = {
+      clientRequestId,
+      items: [{ itemId: gauze.id, quantity: 2 }],
+      matterId: matter.id,
+      patientName: "幂等患者",
+      patientNo: "IDEM1",
+      patientType: "outpatient" as const,
+      usedAt: "2026-03-21",
+    };
+
+    const first = await member.client.usage.create(payload);
+    const second = await member.client.usage.create(payload);
+    const items = await listItems();
+    const listed = await member.client.usage.list({});
+
+    expect({
+      sameId: first.id === second.id,
+      stock: items.find((item) => item.id === gauze.id)?.stock,
+      total: listed.total,
+    }).toStrictEqual({ sameId: true, stock: 8, total: 1 });
   });
 
   it("库存不足整单回滚，不产生半条消耗", async () => {

@@ -621,10 +621,13 @@ const UsagePanel = ({
   operatorName,
   record,
 }: UsagePanelProps) => {
+  const [formVersion, setFormVersion] = useState(0);
+
   const createMutation = useMutation({
     ...api.usage.create.mutationOptions(),
     onSuccess: () => {
       toast.success("用物登记成功，库存已扣减");
+      setFormVersion((current) => current + 1);
       onDone();
     },
   });
@@ -699,7 +702,7 @@ const UsagePanel = ({
 
   return (
     <UsageEntryForm
-      key={data.today.subWarehouseId}
+      key={`${data.today.subWarehouseId}-${formVersion}`}
       defaultOperatorName={operatorName}
       items={data.items}
       subWarehouseId={data.today.subWarehouseId}

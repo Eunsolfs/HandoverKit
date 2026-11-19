@@ -91,6 +91,8 @@ const usageConflict = (message: string) =>
 const usageBaseInput = z.object({
   /** 显式允许跨子仓库借用；默认只允许当前登记子仓库的物品。 */
   allowCrossWarehouse: z.boolean().default(false),
+  /** 客户端为一次表单提交生成的重试幂等键；缺失时服务端生成普通 ID。 */
+  clientRequestId: z.uuid().optional(),
   items: z
     .array(
       z.object({
@@ -113,6 +115,7 @@ const usageBaseInput = z.object({
 
 interface UsageWriteOptions {
   allowCrossWarehouse: boolean;
+  clientRequestId?: string;
   matterId: string;
   subWarehouseId: string;
   items: { itemId: string; quantity: number }[];
@@ -136,7 +139,7 @@ const writeUsage = (
   user: Profile,
   options: UsageWriteOptions
 ): string => {
-  const usageId = randomUUID();
+  const usageId = options.clientRequestId ?? randomUUID();
   const operatorName = options.operatorName ?? user.name;
   const now = new Date();
   const seen = new Set<string>();
@@ -274,6 +277,36 @@ const writeUsage = (
   return usageId;
 };
 
+const findReplayUsage = (
+  db: Database,
+  clientRequestId: string | undefined,
+  matterId: string,
+  userId: string
+): UsageRow | undefined => {
+  if (clientRequestId === undefined) {
+    return undefined;
+  }
+
+  const [existing] = db
+    .select()
+    .from(usageRecord)
+    .where(eq(usageRecord.id, clientRequestId))
+    .all();
+
+  if (existing === undefined) {
+    return undefined;
+  }
+
+  if (existing.matterId !== matterId || existing.operatorUserId !== userId) {
+    throw usageConflict("本次提交标识已被使用，请刷新页面后重新提交");
+  }
+
+  return existing;
+};
+
+const isReplayUniqueViolation = (error: Error): boolean =>
+  error.message.includes("UNIQUE constraint failed: usage_record.id");
+
 export const usageRouter = {
   create: protectedProcedure
     .input(usageBaseInput)
@@ -342,24 +375,59 @@ export const usageRouter = {
         }
       }
 
-      const usageId = writeUsage(context.db, context.user, {
-        allowCrossWarehouse: input.allowCrossWarehouse,
-        backfillReason: null,
-        isBackfill: false,
-        items: input.items,
-        matterId: input.matterId,
-        movementNote: null,
-        note: input.note ?? null,
-        operatorName: input.operatorName,
-        patientName: input.patientName,
-        patientNo: input.patientNo,
-        patientPhone: input.patientPhone ?? null,
-        patientType: input.patientType,
-        recordId: record.id,
-        subWarehouseId,
-        usedAt: input.usedAt,
-        usedAtTime: null,
-      });
+      const replay = findReplayUsage(
+        context.db,
+        input.clientRequestId,
+        input.matterId,
+        context.user.id
+      );
+
+      if (replay !== undefined) {
+        return loadUsageDto(context.db, replay);
+      }
+
+      let usageId: string;
+
+      try {
+        usageId = writeUsage(context.db, context.user, {
+          allowCrossWarehouse: input.allowCrossWarehouse,
+          clientRequestId: input.clientRequestId,
+          backfillReason: null,
+          isBackfill: false,
+          items: input.items,
+          matterId: input.matterId,
+          movementNote: null,
+          note: input.note ?? null,
+          operatorName: input.operatorName,
+          patientName: input.patientName,
+          patientNo: input.patientNo,
+          patientPhone: input.patientPhone ?? null,
+          patientType: input.patientType,
+          recordId: record.id,
+          subWarehouseId,
+          usedAt: input.usedAt,
+          usedAtTime: null,
+        });
+      } catch (error) {
+        if (
+          input.clientRequestId !== undefined &&
+          error instanceof Error &&
+          isReplayUniqueViolation(error)
+        ) {
+          const replayed = findReplayUsage(
+            context.db,
+            input.clientRequestId,
+            input.matterId,
+            context.user.id
+          );
+
+          if (replayed !== undefined) {
+            return loadUsageDto(context.db, replayed);
+          }
+        }
+
+        throw error;
+      }
 
       const created = loadUsageRow(context.db, usageId);
 
@@ -426,24 +494,59 @@ export const usageRouter = {
         )
         .all();
 
-      const usageId = writeUsage(context.db, context.user, {
-        allowCrossWarehouse: input.allowCrossWarehouse,
-        backfillReason: input.backfillReason,
-        isBackfill: true,
-        items: input.items,
-        matterId: input.matterId,
-        movementNote: `补录：${input.backfillReason}`,
-        note: input.note ?? null,
-        operatorName: input.operatorName,
-        patientName: input.patientName,
-        patientNo: input.patientNo,
-        patientPhone: input.patientPhone ?? null,
-        patientType: input.patientType,
-        recordId: record?.id ?? null,
-        subWarehouseId,
-        usedAt: input.usedAt,
-        usedAtTime: input.usedTime,
-      });
+      const replay = findReplayUsage(
+        context.db,
+        input.clientRequestId,
+        input.matterId,
+        context.user.id
+      );
+
+      if (replay !== undefined) {
+        return loadUsageDto(context.db, replay);
+      }
+
+      let usageId: string;
+
+      try {
+        usageId = writeUsage(context.db, context.user, {
+          allowCrossWarehouse: input.allowCrossWarehouse,
+          clientRequestId: input.clientRequestId,
+          backfillReason: input.backfillReason,
+          isBackfill: true,
+          items: input.items,
+          matterId: input.matterId,
+          movementNote: `补录：${input.backfillReason}`,
+          note: input.note ?? null,
+          operatorName: input.operatorName,
+          patientName: input.patientName,
+          patientNo: input.patientNo,
+          patientPhone: input.patientPhone ?? null,
+          patientType: input.patientType,
+          recordId: record?.id ?? null,
+          subWarehouseId,
+          usedAt: input.usedAt,
+          usedAtTime: input.usedTime,
+        });
+      } catch (error) {
+        if (
+          input.clientRequestId !== undefined &&
+          error instanceof Error &&
+          isReplayUniqueViolation(error)
+        ) {
+          const replayed = findReplayUsage(
+            context.db,
+            input.clientRequestId,
+            input.matterId,
+            context.user.id
+          );
+
+          if (replayed !== undefined) {
+            return loadUsageDto(context.db, replayed);
+          }
+        }
+
+        throw error;
+      }
 
       const created = loadUsageRow(context.db, usageId);
 

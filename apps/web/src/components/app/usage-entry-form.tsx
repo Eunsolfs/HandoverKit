@@ -1,5 +1,5 @@
 import { ArrowLeftRightIcon, PlusIcon, Trash2Icon } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { SubmitEvent } from "react";
 
 import {
@@ -33,6 +33,7 @@ interface UsageEntryItem {
 
 export interface UsageEntryValue {
   allowCrossWarehouse: boolean;
+  clientRequestId: string;
   usedAt: string;
   usedTime: string | null;
   backfillReason: string | null;
@@ -90,6 +91,8 @@ export const UsageEntryForm = ({
   submitLabel = "提交登记",
 }: UsageEntryFormProps) => {
   const isBackfill = mode === "backfill";
+  const submittingRef = useRef(false);
+  const clientRequestId = useMemo(() => crypto.randomUUID(), []);
   const [allowCrossWarehouse, setAllowCrossWarehouse] = useState(false);
   const [patient, setPatient] = useState<PatientInfo>(EMPTY_PATIENT_INFO);
   const [rows, setRows] = useState<UsageRow[]>([NEW_ROW]);
@@ -138,6 +141,12 @@ export const UsageEntryForm = ({
   const selectedItemOf = (itemId: string | null) =>
     items.find((item) => item.id === itemId);
 
+  useEffect(() => {
+    if (!pending) {
+      submittingRef.current = false;
+    }
+  }, [pending]);
+
   const updateRow = (index: number, patch: Partial<UsageRow>) => {
     setRows((current) =>
       current.map((row, rowIndex) =>
@@ -149,6 +158,10 @@ export const UsageEntryForm = ({
   // eslint-disable-next-line complexity
   const handleSubmit = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
+
+    if (submittingRef.current) {
+      return;
+    }
 
     const patientErrors = validatePatientInfo(patient);
     const nextErrors: EntryErrors = { patient: patientErrors };
@@ -210,8 +223,11 @@ export const UsageEntryForm = ({
 
     const phone = patient.patientPhone.trim();
 
+    submittingRef.current = true;
+
     onSubmit({
       allowCrossWarehouse,
+      clientRequestId,
       backfillReason: isBackfill ? backfillReason.trim() : null,
       items: payloadItems,
       note: note.trim().length === 0 ? null : note.trim(),

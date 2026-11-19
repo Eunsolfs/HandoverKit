@@ -235,6 +235,7 @@ const UsageCreateDialog = ({
 
   const handleSubmit = (value: UsageEntryValue) => {
     const base = {
+      clientRequestId: value.clientRequestId,
       items: value.items,
       matterId,
       note: value.note,
